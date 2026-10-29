@@ -1,0 +1,125 @@
+.auth-page {
+  min-height: 100dvh;
+  background: var(--background);
+  padding: 56px 24px;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+}
+.auth-brand {
+  margin-bottom: 36px;
+}
+.auth-card {
+  width: 100%;
+  max-width: 560px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 36px;
+  box-shadow: var(--shadow-product);
+}
+.auth-card h1 {
+  font-size: 30px;
+  letter-spacing: -0.8px;
+  line-height: 1.25;
+  margin-bottom: 14px;
+}
+.auth-card > p {
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.8;
+}
+.auth-form {
+  display: grid;
+  gap: 22px;
+  margin-top: 28px;
+}
+.auth-form label {
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+.auth-form input {
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 16px;
+  background: var(--surface);
+  color: var(--foreground);
+}
+.auth-form input:disabled {
+  background: var(--background);
+}
+.auth-error {
+  padding: 14px 16px;
+  background: var(--danger-background);
+  color: var(--danger);
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.auth-setup {
+  margin-top: 20px;
+  padding: 18px;
+  background: var(--warning-background);
+  color: var(--warning);
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.8;
+}
+.auth-footer {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 28px;
+}
+.auth-tenants {
+  list-style: none;
+  padding: 0;
+  margin: 28px 0;
+  display: grid;
+  gap: 14px;
+}
+.auth-tenants button {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  width: 100%;
+  min-height: 76px;
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 18px;
+  color: var(--foreground);
+}
+.auth-tenants button:hover {
+  background: var(--primary-subtle);
+  border-color: var(--primary);
+}
+.auth-tenants strong,
+.auth-tenants small {
+  display: block;
+}
+.auth-tenants strong {
+  font-size: 15px;
+}
+.auth-tenants small {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: 5px;
+}
+@media (max-width: 600px) {
+  .auth-page {
+    padding: 32px 16px;
+  }
+  .auth-card {
+    padding: 28px 22px;
+  }
+  .auth-card h1 {
+    font-size: 27px;
+  }
+}

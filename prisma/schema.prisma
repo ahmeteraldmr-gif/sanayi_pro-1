@@ -1,0 +1,117 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  schemas  = ["sanayipro"]
+}
+
+model Organization {
+  id          String                   @id @default(uuid()) @db.Uuid
+  name        String
+  active      Boolean                  @default(true)
+  createdAt   DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  branches    Branch[]
+  roles       Role[]
+  memberships OrganizationMembership[]
+
+  @@map("organizations")
+  @@schema("sanayipro")
+}
+
+model Branch {
+  id             String             @id @default(uuid()) @db.Uuid
+  organizationId String             @map("organization_id") @db.Uuid
+  name           String
+  active         Boolean            @default(true)
+  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  memberships    BranchMembership[]
+
+  @@unique([id, organizationId])
+  @@index([organizationId])
+  @@map("branches")
+  @@schema("sanayipro")
+}
+
+model UserProfile {
+  id          String                   @id @db.Uuid
+  displayName String                   @map("display_name")
+  active      Boolean                  @default(true)
+  createdAt   DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  memberships OrganizationMembership[]
+
+  @@map("user_profiles")
+  @@schema("sanayipro")
+}
+
+model OrganizationMembership {
+  organizationId String             @map("organization_id") @db.Uuid
+  userId         String             @map("user_id") @db.Uuid
+  roleId         String             @map("role_id") @db.Uuid
+  active         Boolean            @default(true)
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  user           UserProfile        @relation(fields: [userId], references: [id], onDelete: Restrict)
+  role           Role               @relation(fields: [roleId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  branches       BranchMembership[]
+
+  @@id([organizationId, userId])
+  @@index([userId])
+  @@map("organization_memberships")
+  @@schema("sanayipro")
+}
+
+model BranchMembership {
+  branchId       String                 @map("branch_id") @db.Uuid
+  organizationId String                 @map("organization_id") @db.Uuid
+  userId         String                 @map("user_id") @db.Uuid
+  roleId         String                 @map("role_id") @db.Uuid
+  active         Boolean                @default(true)
+  branch         Branch                 @relation(fields: [branchId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  membership     OrganizationMembership @relation(fields: [organizationId, userId], references: [organizationId, userId], onDelete: Restrict)
+  role           Role                   @relation(fields: [roleId, organizationId], references: [id, organizationId], onDelete: Restrict)
+
+  @@id([branchId, userId])
+  @@index([organizationId, userId])
+  @@map("branch_memberships")
+  @@schema("sanayipro")
+}
+
+model Role {
+  id             String                   @id @default(uuid()) @db.Uuid
+  organizationId String                   @map("organization_id") @db.Uuid
+  code           String
+  name           String
+  organization   Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  permissions    RolePermission[]
+  orgMembers     OrganizationMembership[]
+  branchMembers  BranchMembership[]
+
+  @@unique([id, organizationId])
+  @@unique([organizationId, code])
+  @@map("roles")
+  @@schema("sanayipro")
+}
+
+model Permission {
+  code  String           @id
+  name  String
+  roles RolePermission[]
+
+  @@map("permissions")
+  @@schema("sanayipro")
+}
+
+model RolePermission {
+  organizationId String     @map("organization_id") @db.Uuid
+  roleId         String     @map("role_id") @db.Uuid
+  permissionCode String     @map("permission_code")
+  role           Role       @relation(fields: [roleId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  permission     Permission @relation(fields: [permissionCode], references: [code], onDelete: Restrict)
+
+  @@id([roleId, permissionCode])
+  @@map("role_permissions")
+  @@schema("sanayipro")
+}

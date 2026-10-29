@@ -1,0 +1,424 @@
+"use client";
+
+import { useActionState, useState, useMemo } from "react";
+import Link from "next/link";
+import {
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  ArrowRight,
+  AlertCircle,
+  Loader2,
+  Check,
+  Search,
+  Wrench,
+  Cog,
+  Gauge,
+  Disc,
+  Flame,
+  Zap,
+  Cpu,
+  Snowflake,
+  BatteryCharging,
+  Hammer,
+  Paintbrush,
+  Sparkles,
+  Layers,
+  Shield,
+  Scissors,
+  KeyRound,
+  Radio,
+  Wind,
+  Thermometer,
+  CircleDot,
+  Timer,
+  Fuel,
+} from "lucide-react";
+import { signInAction, startDemoTrialAction } from "@/app/auth/actions";
+import {
+  CRAFTSMAN_BRANCHES,
+  type CraftsmanBranchId,
+  type BranchCategory,
+} from "@/lib/branch-profiles";
+
+interface LoginFormProps {
+  configured?: boolean;
+}
+
+const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
+  Wrench,
+  Cog,
+  Gauge,
+  Disc,
+  Flame,
+  Zap,
+  Cpu,
+  Snowflake,
+  BatteryCharging,
+  Hammer,
+  Paintbrush,
+  Sparkles,
+  Layers,
+  Shield,
+  Scissors,
+  KeyRound,
+  Radio,
+  Wind,
+  Thermometer,
+  CircleDot,
+  Timer,
+  Fuel,
+};
+
+const CATEGORIES: Array<{ id: "ALL" | BranchCategory; label: string }> = [
+  { id: "ALL", label: "Tümü (23)" },
+  { id: "Mekanik & Güç Aktarma", label: "Mekanik (9)" },
+  { id: "Elektrik & Elektronik", label: "Elektrik (6)" },
+  { id: "Gövde, Boya & Cam", label: "Gövde & Boya (6)" },
+  { id: "Donanım, Lastik & Bakım", label: "Donanım & Bakım (2)" },
+];
+
+export function LoginForm({ configured: _configured = true }: LoginFormProps) {
+  void _configured;
+  const [state, action, pending] = useActionState(signInAction, null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [demoPending, setDemoPending] = useState(false);
+
+  // Branch demo selection
+  const [selectedBranchId, setSelectedBranchId] = useState<CraftsmanBranchId>("motor-mekanik");
+  const [branchSearch, setBranchSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<"ALL" | BranchCategory>("ALL");
+
+  // Standard account credentials
+  const [email, setEmail] = useState<string>("");
+  const [password, setPassword] = useState<string>("");
+
+  const filteredBranches = useMemo(() => {
+    return CRAFTSMAN_BRANCHES.filter((b) => {
+      const matchesCategory =
+        selectedCategory === "ALL" || b.category === selectedCategory;
+      const q = branchSearch.trim().toLowerCase();
+      const matchesSearch =
+        !q ||
+        b.name.toLowerCase().includes(q) ||
+        b.craftsmanTitle.toLowerCase().includes(q) ||
+        b.shortDesc.toLowerCase().includes(q) ||
+        b.businessName.toLowerCase().includes(q);
+      return matchesCategory && matchesSearch;
+    });
+  }, [branchSearch, selectedCategory]);
+
+  const selectedBranch = useMemo(() => {
+    return (
+      CRAFTSMAN_BRANCHES.find((b) => b.id === selectedBranchId) ??
+      CRAFTSMAN_BRANCHES[0]
+    );
+  }, [selectedBranchId]);
+
+  const SelectedIcon = ICON_MAP[selectedBranch.icon] ?? Wrench;
+
+  const handleStartBranchDemo = async () => {
+    setDemoPending(true);
+    try {
+      await startDemoTrialAction(selectedBranch.id);
+    } catch (err) {
+      if (String(err).includes("NEXT_REDIRECT")) throw err;
+    } finally {
+      setDemoPending(false);
+    }
+  };
+
+  const handleFillDemoCreds = (demoEmail: string, demoPass: string) => {
+    setEmail(demoEmail);
+    setPassword(demoPass);
+  };
+
+  return (
+    <form action={action} className="login-form" noValidate={false}>
+      {/* ==================================================================
+          SANAYİPRO'YU MESLEĞİNİZE GÖRE DENEYİN (23 USTA BRANŞINA ÖZEL DEMO)
+          ================================================================== */}
+      <div className="login-branch-demo-card">
+        <div className="login-branch-demo-top">
+          <div className="login-branch-demo-tag">
+            <Sparkles size={14} className="text-amber-500" aria-hidden="true" />
+            <span>23 USTA BRANŞINA ÖZEL DENEYİM</span>
+          </div>
+          <span className="login-branch-demo-pill">İzole Atölye Demosu</span>
+        </div>
+
+        <div className="login-branch-demo-heading">
+          <strong>SanayiPro&apos;yu Mesleğinize Göre Deneyin</strong>
+          <p>
+            Uzmanlık alanınızı seçin, SanayiPro&apos;nun sizin işinizde nasıl çalıştığını görün.
+          </p>
+        </div>
+
+        {/* Branş Arama & Kategori Filtresi */}
+        <div className="login-branch-search-bar">
+          <Search size={15} className="login-branch-search-icon" aria-hidden="true" />
+          <input
+            type="search"
+            value={branchSearch}
+            onChange={(e) => setBranchSearch(e.target.value)}
+            placeholder="Branş veya meslek ara... (örn: Motor, Şanzıman, Lastik, Boya)"
+            className="login-branch-search-input"
+            aria-label="Usta branşı ara"
+          />
+        </div>
+
+        <div className="login-branch-category-tabs" role="tablist" aria-label="Branş Kategorileri">
+          {CATEGORIES.map((cat) => (
+            <button
+              key={cat.id}
+              type="button"
+              role="tab"
+              aria-selected={selectedCategory === cat.id}
+              onClick={() => setSelectedCategory(cat.id)}
+              className={`login-branch-category-btn ${
+                selectedCategory === cat.id ? "is-active" : ""
+              }`}
+            >
+              {cat.label}
+            </button>
+          ))}
+        </div>
+
+        {/* 23 Branş Seçici (Kompakt ve Hızlı) */}
+        <div
+          className="login-branch-grid"
+          role="radiogroup"
+          aria-label="SanayiPro Usta Branşları"
+        >
+          {filteredBranches.map((branch) => {
+            const Icon = ICON_MAP[branch.icon] ?? Wrench;
+            const isSelected = selectedBranchId === branch.id;
+
+            return (
+              <button
+                key={branch.id}
+                type="button"
+                role="radio"
+                aria-checked={isSelected}
+                onClick={() => setSelectedBranchId(branch.id)}
+                className={`login-branch-item ${isSelected ? "is-selected" : ""}`}
+                title={`${branch.name} — ${branch.craftsmanTitle}`}
+              >
+                <span className="login-branch-item-icon">
+                  <Icon size={15} />
+                </span>
+                <span className="login-branch-item-name">{branch.name}</span>
+                {isSelected && (
+                  <span className="login-branch-item-check" aria-hidden="true">
+                    <Check size={12} strokeWidth={3} />
+                  </span>
+                )}
+              </button>
+            );
+          })}
+          {filteredBranches.length === 0 && (
+            <div className="login-branch-empty">
+              <span>Aradığınız kriterde branş bulunamadı.</span>
+            </div>
+          )}
+        </div>
+
+        {/* Seçili Branş Özeti */}
+        <div className="login-branch-preview">
+          <div className="login-branch-preview-header">
+            <div className="login-branch-preview-icon">
+              <SelectedIcon size={20} />
+            </div>
+            <div className="login-branch-preview-titles">
+              <span className="login-branch-preview-title">
+                {selectedBranch.name} · {selectedBranch.craftsmanTitle}
+              </span>
+              <span className="login-branch-preview-biz">
+                Örnek Atölye: <strong>{selectedBranch.businessName}</strong>
+              </span>
+            </div>
+          </div>
+          <p className="login-branch-preview-desc">
+            {selectedBranch.shortDesc}
+          </p>
+        </div>
+
+        {/* Dinamik Branş Giriş Butonu */}
+        <button
+          type="button"
+          onClick={handleStartBranchDemo}
+          disabled={demoPending || pending}
+          className="login-branch-demo-action-btn"
+        >
+          {demoPending ? (
+            <>
+              <Loader2 className="login-spinner" size={17} aria-hidden="true" />
+              <span>{selectedBranch.craftsmanTitle} Demosu Hazırlanıyor…</span>
+            </>
+          ) : (
+            <>
+              <span className="truncate">
+                {selectedBranch.craftsmanTitle} Demosuna Gir
+              </span>
+              <ArrowRight size={17} aria-hidden="true" />
+            </>
+          )}
+        </button>
+      </div>
+
+      <div className="login-divider" aria-hidden="true">
+        <span>veya kayıtlı işletmenizle giriş yapın</span>
+      </div>
+
+      {/* Hızlı Demo Giriş Kısayolları (Opsiyonel Kolaylık) */}
+      <div className="login-creds-quick-links">
+        <span className="login-creds-hint">Hızlı form doldur:</span>
+        <button
+          type="button"
+          className="login-creds-pill"
+          onClick={() => handleFillDemoCreds("admin@sanayipro.com", "sanayipro_admin")}
+        >
+          Yönetici Girişi
+        </button>
+        <button
+          type="button"
+          className="login-creds-pill"
+          onClick={() => handleFillDemoCreds("mehmet.usta@sanayipro.com", "sanayipro_usta")}
+        >
+          Usta Girişi
+        </button>
+      </div>
+
+      {/* E-posta Alanı */}
+      <div className="login-field">
+        <label htmlFor="login-email" className="login-label">
+          E-posta
+        </label>
+        <div className="login-input-wrap">
+          <Mail className="login-input-icon" size={18} aria-hidden="true" />
+          <input
+            id="login-email"
+            name="email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="ornek@sanayipro.com"
+            autoComplete="username"
+            required
+            maxLength={254}
+            disabled={pending}
+            aria-invalid={!!state?.error}
+            aria-describedby={state?.error ? "login-error-msg" : undefined}
+            className="login-input"
+          />
+        </div>
+      </div>
+
+      {/* Şifre Alanı */}
+      <div className="login-field">
+        <label htmlFor="login-password" className="login-label">
+          Şifre
+        </label>
+        <div className="login-input-wrap">
+          <Lock className="login-input-icon" size={18} aria-hidden="true" />
+          <input
+            id="login-password"
+            name="password"
+            type={showPassword ? "text" : "password"}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Şifrenizi girin"
+            autoComplete="current-password"
+            required
+            maxLength={1024}
+            disabled={pending}
+            aria-invalid={!!state?.error}
+            aria-describedby={state?.error ? "login-error-msg" : undefined}
+            className="login-input"
+          />
+          <button
+            type="button"
+            className="login-toggle-password"
+            onClick={() => setShowPassword((prev) => !prev)}
+            aria-label={showPassword ? "Şifreyi gizle" : "Şifreyi göster"}
+            tabIndex={0}
+          >
+            {showPassword ? (
+              <EyeOff size={18} aria-hidden="true" />
+            ) : (
+              <Eye size={18} aria-hidden="true" />
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Beni Hatırla & Hızlı Link */}
+      <div className="login-aux-row">
+        <label htmlFor="login-remember" className="login-remember">
+          <input
+            id="login-remember"
+            name="remember"
+            type="checkbox"
+            defaultChecked
+            className="login-checkbox"
+          />
+          <span>Beni hatırla</span>
+        </label>
+        <Link href="/app" className="login-direct-link" title="Doğrudan panele eriş">
+          Doğrudan Panele Geç →
+        </Link>
+      </div>
+
+      {/* Hata Bildirimi */}
+      {state?.error && (
+        <div
+          id="login-error-msg"
+          role="alert"
+          aria-live="polite"
+          className="login-error-alert"
+        >
+          <AlertCircle className="login-error-icon" size={18} aria-hidden="true" />
+          <span>{state.error}</span>
+        </div>
+      )}
+
+      {/* Giriş Butonu */}
+      <button
+        type="submit"
+        disabled={pending}
+        className="login-submit-btn"
+        aria-busy={pending}
+      >
+        {pending ? (
+          <>
+            <Loader2 className="login-spinner" size={18} aria-hidden="true" />
+            <span>Giriş yapılıyor…</span>
+          </>
+        ) : (
+          <>
+            <span>Giriş Yap</span>
+            <ArrowRight size={18} aria-hidden="true" />
+          </>
+        )}
+      </button>
+
+      {/* Kayıt Ol Linki */}
+      <div className="login-footer-action">
+        <span>Hesabınız yok mu?</span>{" "}
+        <Link href="/register" className="login-register-link">
+          Kayıt Ol →
+        </Link>
+      </div>
+
+      {/* Demo Talep Et CTA */}
+      <div className="login-divider" aria-hidden="true">
+        <span>veya</span>
+      </div>
+
+      <Link href="/#demo-form" className="login-demo-btn">
+        Özel Demo ve Tanıtım Talep Et
+      </Link>
+    </form>
+  );
+}
