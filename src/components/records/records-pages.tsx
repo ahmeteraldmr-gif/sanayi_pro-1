@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState, useMemo, type FormEvent } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -23,10 +24,24 @@ import {
 } from "lucide-react";
 import { useDemo } from "@/components/app-shell/demo-provider";
 import { QuickActions } from "@/components/app-shell/quick-actions";
-import { PlateScannerModal } from "@/components/plate-reader/plate-scanner-modal";
-import { QuickFlowDrawer } from "@/components/app-shell/quick-flow-drawer";
 import { EntryForm, Summary } from "@/components/modules/module-ui";
 import { Button } from "@/components/ui/button";
+
+const PlateScannerModal = dynamic(
+  () =>
+    import("@/components/plate-reader/plate-scanner-modal").then(
+      (m) => m.PlateScannerModal,
+    ),
+  { ssr: false },
+);
+
+const QuickFlowDrawer = dynamic(
+  () =>
+    import("@/components/app-shell/quick-flow-drawer").then(
+      (m) => m.QuickFlowDrawer,
+    ),
+  { ssr: false },
+);
 import {
   Dialog,
   DialogContent,
@@ -42,6 +57,7 @@ import {
   number,
   type Customer,
   type Vehicle,
+  type WorkOrder,
 } from "@/lib/demo-data";
 import { earlierMeganeVisits } from "@/lib/intake-data";
 
@@ -63,20 +79,31 @@ export function RecordsDirectory({
 
   const token = normalizeSearch(query).replace(/^90(?=\d{10}$)/, "0");
 
-  // Build unified customer + vehicle rows
-  const rows = customers
-    .map((customer) => {
-      const ownedVehicles = vehicles.filter(
-        (vehicle) => vehicle.customerId === customer.id,
-      );
+  // Pre-index vehicles & orders for O(N) linear record assembly
+  const { allRows, activeVehiclesCount, inServiceCount } = useMemo(() => {
+    const vehiclesByCustomer = new Map<string, Vehicle[]>();
+    for (const v of vehicles) {
+      const list = vehiclesByCustomer.get(v.customerId);
+      if (list) list.push(v);
+      else vehiclesByCustomer.set(v.customerId, [v]);
+    }
+
+    const ordersByCustomer = new Map<string, WorkOrder[]>();
+    for (const o of orders) {
+      const list = ordersByCustomer.get(o.customerId);
+      if (list) list.push(o);
+      else ordersByCustomer.set(o.customerId, [o]);
+    }
+
+    let inService = 0;
+    const all = customers.map((customer) => {
+      const ownedVehicles = vehiclesByCustomer.get(customer.id) ?? [];
       const activeVehicles = ownedVehicles.filter((v) => v.active !== false);
       const passiveVehicles = ownedVehicles.filter((v) => v.active === false);
-      const customerOrders = orders.filter(
-        (order) => order.customerId === customer.id,
-      );
-      const activeOrder = customerOrders.find((order) =>
-        isActive(order.status),
-      );
+      const customerOrders = ordersByCustomer.get(customer.id) ?? [];
+      const activeOrder = customerOrders.find((order) => isActive(order.status));
+      if (activeOrder) inService++;
+
       const primaryVehicle =
         (activeOrder
           ? ownedVehicles.find((v) => v.id === activeOrder.vehicleId)
@@ -106,13 +133,21 @@ export function RecordsDirectory({
         latestService,
         searchable,
       };
-    })
-    .filter((row) => !token || row.searchable.includes(token));
+    });
 
-  const activeVehiclesCount = vehicles.filter((v) => v.active !== false).length;
-  const inServiceCount = customers.filter((c) =>
-    orders.some((o) => o.customerId === c.id && isActive(o.status)),
-  ).length;
+    const activeVehiclesTotal = vehicles.filter((v) => v.active !== false).length;
+
+    return {
+      allRows: all,
+      activeVehiclesCount: activeVehiclesTotal,
+      inServiceCount: inService,
+    };
+  }, [customers, vehicles, orders]);
+
+  const rows = useMemo(() => {
+    if (!token) return allRows;
+    return allRows.filter((row) => row.searchable.includes(token));
+  }, [allRows, token]);
 
   return (
     <>

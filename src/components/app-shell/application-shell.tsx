@@ -311,7 +311,7 @@ export function ApplicationShell({
     }
   }, [pathname, remember]);
 
-  // Failsafe 2: Periodic / event-driven check for stuck pointer-events or overflow
+  // Failsafe 2: Event-driven cleanup for stuck pointer-events, overflow or scroll locks
   useEffect(() => {
     if (typeof window === "undefined" || typeof document === "undefined") return;
 
@@ -332,16 +332,15 @@ export function ApplicationShell({
       }
     };
 
-    const interval = setInterval(cleanupStuckStyles, 400);
+    cleanupStuckStyles();
     window.addEventListener("pointerdown", cleanupStuckStyles, { capture: true, passive: true });
     window.addEventListener("keydown", cleanupStuckStyles, { capture: true, passive: true });
 
     return () => {
-      clearInterval(interval);
       window.removeEventListener("pointerdown", cleanupStuckStyles, { capture: true });
       window.removeEventListener("keydown", cleanupStuckStyles, { capture: true });
     };
-  }, []);
+  }, [pathname, menuOpen, notifOpen, userMenuOpen, craftModalOpen]);
 
   // Warm up core application routes during idle time so first clicks are fast
   useEffect(() => {
@@ -395,8 +394,9 @@ export function ApplicationShell({
     const list: SmartAlert[] = [];
     const branchOrders = orders.filter((order) => order.branchId === branchId);
 
-    // 1. Geciken teslim
+    // Single consolidated traversal over branch orders
     for (const order of branchOrders) {
+      // 1. Geciken teslim
       if (isOverdue(order)) {
         const vehicle = vehicleFor(order);
         list.push({
@@ -409,10 +409,8 @@ export function ApplicationShell({
           ctaLabel: "İş Emrine Git →",
         });
       }
-    }
 
-    // 2. Müşteri onayı bekleyen teklif
-    for (const order of branchOrders) {
+      // 2. Müşteri onayı bekleyen teklif
       const pendingAmt = pendingApprovalAmount(order);
       if (
         order.approval === "PENDING" &&
@@ -430,10 +428,8 @@ export function ApplicationShell({
           ctaLabel: "Teklifi Aç →",
         });
       }
-    }
 
-    // 3. Parça bekleyen iş emri
-    for (const order of branchOrders) {
+      // 3. Parça bekleyen iş emri
       const activeRequests = (order.partRequests ?? []).filter(
         (req) => req.status === "REQUESTED" || req.status === "PREPARING",
       );
@@ -453,6 +449,41 @@ export function ApplicationShell({
           ctaLabel: "Parçaları Gör →",
         });
       }
+
+      // 5. Açık bakiye
+      const balance = Math.max(0, order.total - order.paid);
+      if (balance > 0 && order.status !== "CANCELLED") {
+        const vehicle = vehicleFor(order);
+        const customer = customerFor(order);
+        list.push({
+          id: `balance-${order.id}`,
+          category: "Açık Bakiye",
+          tone: "info",
+          title: `${vehicle.plate} · ${money(balance)} açık bakiye`,
+          subtitle: `${customer.name} · #${order.id}`,
+          href: `/app/work-orders/${order.id}?tab=payments`,
+          ctaLabel: "Tahsilata Git →",
+        });
+      }
+
+      // 6. Uzun süredir bekleyen araç
+      if (
+        isActive(order.status) &&
+        (order.stageDuration.includes("saat") ||
+          order.status === "WAITING_PARTS" ||
+          order.status === "AWAITING_APPROVAL")
+      ) {
+        const vehicle = vehicleFor(order);
+        list.push({
+          id: `waiting-vehicle-${order.id}`,
+          category: "Uzun Süredir Bekleyen Araç",
+          tone: "neutral",
+          title: `${vehicle.plate} · ${order.stageDuration} aynı aşamada`,
+          subtitle: `#${order.id} · ${order.complaint}`,
+          href: `/app/work-orders/${order.id}`,
+          ctaLabel: "Kaydı Aç →",
+        });
+      }
     }
 
     // 4. Kritik stok
@@ -469,45 +500,6 @@ export function ApplicationShell({
           subtitle: `Kullanılabilir ${part.physical - part.reserved} adet · Minimum ${part.minimum} adet`,
           href: `/app/stock/${part.id}`,
           ctaLabel: "Parçayı İncele →",
-        });
-      }
-    }
-
-    // 5. Açık bakiye
-    for (const order of branchOrders) {
-      const balance = Math.max(0, order.total - order.paid);
-      if (balance > 0 && order.status !== "CANCELLED") {
-        const vehicle = vehicleFor(order);
-        const customer = customerFor(order);
-        list.push({
-          id: `balance-${order.id}`,
-          category: "Açık Bakiye",
-          tone: "info",
-          title: `${vehicle.plate} · ${money(balance)} açık bakiye`,
-          subtitle: `${customer.name} · #${order.id}`,
-          href: `/app/work-orders/${order.id}?tab=payments`,
-          ctaLabel: "Tahsilata Git →",
-        });
-      }
-    }
-
-    // 6. Uzun süredir bekleyen araç
-    for (const order of branchOrders) {
-      if (
-        isActive(order.status) &&
-        (order.stageDuration.includes("saat") ||
-          order.status === "WAITING_PARTS" ||
-          order.status === "AWAITING_APPROVAL")
-      ) {
-        const vehicle = vehicleFor(order);
-        list.push({
-          id: `waiting-vehicle-${order.id}`,
-          category: "Uzun Süredir Bekleyen Araç",
-          tone: "neutral",
-          title: `${vehicle.plate} · ${order.stageDuration} aynı aşamada`,
-          subtitle: `#${order.id} · ${order.complaint}`,
-          href: `/app/work-orders/${order.id}`,
-          ctaLabel: "Kaydı Aç →",
         });
       }
     }

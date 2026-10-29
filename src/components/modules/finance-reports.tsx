@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useDemo } from "@/components/app-shell/demo-provider";
 import { useOperations } from "./operations-store";
 import { isActive, money, statuses } from "@/lib/demo-data";
@@ -22,6 +22,44 @@ export function FinancePage() {
   const { data, update } = useOperations();
   const [tab, setTab] = useState("Tahsilatlar");
 
+  const orders = useMemo(
+    () => demo.orders.filter((o) => o.branchId === demo.branchId && o.status !== "CANCELLED"),
+    [demo.orders, demo.branchId],
+  );
+  const ids = useMemo(() => new Set(orders.map((o) => o.id)), [orders]);
+  const payments = useMemo(
+    () => demo.payments.filter((p) => ids.has(p.orderId)),
+    [demo.payments, ids],
+  );
+  const expenses = useMemo(
+    () => data.expenses.filter((e) => e.branchId === demo.branchId && e.kind === "expense"),
+    [data.expenses, demo.branchId],
+  );
+  const refunds = useMemo(
+    () => data.expenses.filter((e) => e.branchId === demo.branchId && e.kind === "refund"),
+    [data.expenses, demo.branchId],
+  );
+  const gross = useMemo(
+    () =>
+      orders
+        .filter((o) => o.status === "DELIVERED")
+        .reduce(
+          (n, o) =>
+            n +
+            o.total -
+            o.parts
+              .filter((p) => p.state === "CONSUMED")
+              .reduce((a, p) => a + p.historicCost * p.quantity, 0) -
+            o.additionalCosts,
+          0,
+        ),
+    [orders],
+  );
+  const openBalance = useMemo(
+    () => orders.reduce((n, o) => n + Math.max(0, o.total - o.paid), 0),
+    [orders],
+  );
+
   if (demo.currentUser.isTechnician) {
     return (
       <div className="module-page">
@@ -38,33 +76,6 @@ export function FinancePage() {
       </div>
     );
   }
-  const orders = demo.orders.filter(
-    (o) => o.branchId === demo.branchId && o.status !== "CANCELLED",
-  );
-  const ids = orders.map((o) => o.id);
-  const payments = demo.payments.filter((p) => ids.includes(p.orderId));
-  const expenses = data.expenses.filter(
-    (e) => e.branchId === demo.branchId && e.kind === "expense",
-  );
-  const refunds = data.expenses.filter(
-    (e) => e.branchId === demo.branchId && e.kind === "refund",
-  );
-  const gross = orders
-    .filter((o) => o.status === "DELIVERED")
-    .reduce(
-      (n, o) =>
-        n +
-        o.total -
-        o.parts
-          .filter((p) => p.state === "CONSUMED")
-          .reduce((a, p) => a + p.historicCost * p.quantity, 0) -
-        o.additionalCosts,
-      0,
-    );
-  const openBalance = orders.reduce(
-    (n, o) => n + Math.max(0, o.total - o.paid),
-    0,
-  );
   const addExpense = (
     <EntryForm
       title={tab === "İadeler" ? "İade Kaydet" : "Gider Ekle"}
@@ -384,6 +395,43 @@ export function ReportsPage() {
   const { data } = useOperations();
   const [tab, setTab] = useState(reports[0]);
 
+  const orders = useMemo(
+    () => demo.orders.filter((o) => o.branchId === demo.branchId && o.status !== "CANCELLED"),
+    [demo.orders, demo.branchId],
+  );
+  const amounts = useMemo(
+    () =>
+      orders.reduce(
+        (n, o) => ({ total: n.total + o.total, paid: n.paid + o.paid }),
+        { total: 0, paid: 0 },
+      ),
+    [orders],
+  );
+  const workload = useMemo(
+    () =>
+      data.employees
+        .filter((e) => e.branchId === demo.branchId)
+        .map((e) => ({
+          label: e.name,
+          value: orders.filter(
+            (o) => o.assigneeIds.includes(e.id) && isActive(o.status),
+          ).length,
+        })),
+    [data.employees, demo.branchId, orders],
+  );
+  const chart = useMemo(
+    () =>
+      tab === "Ekip İş Yükü"
+        ? workload
+        : Object.entries(statuses)
+            .filter(([key]) => key !== "CANCELLED")
+            .map(([key, v]) => ({
+              label: v.short,
+              value: orders.filter((o) => o.status === key).length,
+            })),
+    [tab, workload, orders],
+  );
+
   if (demo.currentUser.isTechnician) {
     return (
       <div className="module-page">
@@ -399,30 +447,6 @@ export function ReportsPage() {
       </div>
     );
   }
-  const orders = demo.orders.filter(
-    (o) => o.branchId === demo.branchId && o.status !== "CANCELLED",
-  );
-  const amounts = orders.reduce(
-    (n, o) => ({ total: n.total + o.total, paid: n.paid + o.paid }),
-    { total: 0, paid: 0 },
-  );
-  const workload = data.employees
-    .filter((e) => e.branchId === demo.branchId)
-    .map((e) => ({
-      label: e.name,
-      value: orders.filter(
-        (o) => o.assigneeIds.includes(e.id) && isActive(o.status),
-      ).length,
-    }));
-  const chart =
-    tab === "Ekip İş Yükü"
-      ? workload
-      : Object.entries(statuses)
-          .filter(([key]) => key !== "CANCELLED")
-          .map(([key, v]) => ({
-            label: v.short,
-            value: orders.filter((o) => o.status === key).length,
-          }));
   const max = Math.max(1, ...chart.map((c) => c.value));
   return (
     <div className="module-page">

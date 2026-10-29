@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useState, useMemo, type ReactNode } from "react";
 import { ArrowUpRight, Package, Phone, Truck, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useDemo } from "@/components/app-shell/demo-provider";
@@ -177,38 +177,59 @@ export function StockPage({
   const [stockFilter, setStockFilter] = useState<
     "all" | "critical" | "reserved"
   >("all");
-  const part = data.parts.find(
-    (p) => p.id === id && p.branchId === demo.branchId,
-  );
-  const branchParts = data.parts.filter((p) => p.branchId === demo.branchId);
-  const criticalCount = branchParts.filter(
-    (p) => p.physical - p.reserved < p.minimum,
-  ).length;
-  const totalAvailable = branchParts.reduce(
-    (sum, p) => sum + Math.max(0, p.physical - p.reserved),
-    0,
-  );
-  const totalReserved = branchParts.reduce((sum, p) => sum + p.reserved, 0);
+  const { branchParts, partsById, branchPartIdSet, criticalCount, totalAvailable, totalReserved } = useMemo(() => {
+    const bp = data.parts.filter((p) => p.branchId === demo.branchId);
+    const map = new Map<string, StockPart>();
+    const idSet = new Set<string>();
+    let crit = 0;
+    let avail = 0;
+    let res = 0;
+    for (const p of bp) {
+      map.set(p.id, p);
+      idSet.add(p.id);
+      if (p.physical - p.reserved < p.minimum) crit++;
+      avail += Math.max(0, p.physical - p.reserved);
+      res += p.reserved;
+    }
+    return {
+      branchParts: bp,
+      partsById: map,
+      branchPartIdSet: idSet,
+      criticalCount: crit,
+      totalAvailable: avail,
+      totalReserved: res,
+    };
+  }, [data.parts, demo.branchId]);
 
-  const list = branchParts.filter((p) => {
-    const matchesQuery = `${p.name} ${p.code}`
-      .toLocaleLowerCase("tr")
-      .includes(query.toLocaleLowerCase("tr"));
-    if (!matchesQuery) return false;
-    if (stockFilter === "critical") return p.physical - p.reserved < p.minimum;
-    if (stockFilter === "reserved") return p.reserved > 0;
-    return true;
-  });
+  const part = id ? partsById.get(id) : undefined;
 
-  const branchMovements = data.movements.filter((m) =>
-    branchParts.some((p) => p.id === m.partId),
+  const list = useMemo(() => {
+    const q = query.toLocaleLowerCase("tr").trim();
+    return branchParts.filter((p) => {
+      if (q && !`${p.name} ${p.code}`.toLocaleLowerCase("tr").includes(q)) {
+        return false;
+      }
+      if (stockFilter === "critical") return p.physical - p.reserved < p.minimum;
+      if (stockFilter === "reserved") return p.reserved > 0;
+      return true;
+    });
+  }, [branchParts, query, stockFilter]);
+
+  const branchMovements = useMemo(
+    () => data.movements.filter((m) => branchPartIdSet.has(m.partId)),
+    [data.movements, branchPartIdSet],
   );
-  const filteredMovements = branchMovements.filter((m) => {
-    const p = branchParts.find((x) => x.id === m.partId);
-    return `${p?.name ?? ""} ${p?.code ?? ""} ${m.note ?? ""} ${m.orderId ?? ""}`
-      .toLocaleLowerCase("tr")
-      .includes(query.toLocaleLowerCase("tr"));
-  });
+
+  const filteredMovements = useMemo(() => {
+    const q = query.toLocaleLowerCase("tr").trim();
+    if (!q) return branchMovements;
+    return branchMovements.filter((m) => {
+      const p = partsById.get(m.partId);
+      return `${p?.name ?? ""} ${p?.code ?? ""} ${m.note ?? ""} ${m.orderId ?? ""}`
+        .toLocaleLowerCase("tr")
+        .includes(q);
+    });
+  }, [branchMovements, partsById, query]);
 
   const fields: Field[] = [
     { name: "name", label: "Parça adı", required: true },

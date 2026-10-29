@@ -32,8 +32,23 @@ import {
 } from "@/lib/demo-data";
 import { useOperations } from "@/components/modules/operations-store";
 import { useDemo } from "@/components/app-shell/demo-provider";
-import { PlateScannerModal } from "@/components/plate-reader/plate-scanner-modal";
-import { QuickFlowDrawer } from "@/components/app-shell/quick-flow-drawer";
+import dynamic from "next/dynamic";
+
+const PlateScannerModal = dynamic(
+  () =>
+    import("@/components/plate-reader/plate-scanner-modal").then(
+      (m) => m.PlateScannerModal,
+    ),
+  { ssr: false },
+);
+
+const QuickFlowDrawer = dynamic(
+  () =>
+    import("@/components/app-shell/quick-flow-drawer").then(
+      (m) => m.QuickFlowDrawer,
+    ),
+  { ssr: false },
+);
 
 export function GlobalSearch() {
   const router = useRouter();

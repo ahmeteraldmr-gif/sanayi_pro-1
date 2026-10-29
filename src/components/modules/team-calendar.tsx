@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   ArrowRight,
   CheckCircle2,
@@ -20,6 +20,7 @@ import {
   deliveryLabel,
   isActive,
   statuses,
+  type WorkOrder,
 } from "@/lib/demo-data";
 import { QuickActions } from "@/components/app-shell/quick-actions";
 import {
@@ -94,44 +95,71 @@ export function TeamPage({ id }: { id?: string }) {
     />
   );
 
-  if (id && !employee) return <Missing back="/app/team" />;
-
-  const active = (eid: string) =>
-    demo.orders.filter(
-      (o) =>
-        (o.technicianId === eid || o.assigneeIds.includes(eid)) &&
-        isActive(o.status),
-    );
-
-  const complete = (eid: string) =>
-    demo.orders.filter(
-      (o) =>
-        (o.technicianId === eid || o.assigneeIds.includes(eid)) &&
-        o.status === "DELIVERED",
-    );
-
   const todayKey = new Date().toISOString().slice(0, 10);
-  const branchEmployees = data.employees.filter(
-    (e) => e.branchId === demo.branchId,
-  );
-  const filteredEmployees = branchEmployees.filter((e) =>
-    `${e.name} ${e.specialty} ${e.role}`
-      .toLocaleLowerCase("tr")
-      .includes(query.toLocaleLowerCase("tr")),
+
+  // Pre-index technician orders in a single pass O(O)
+  const { activeMap, deliveredMap, completedTodayCount } = useMemo(() => {
+    const act = new Map<string, WorkOrder[]>();
+    const del = new Map<string, WorkOrder[]>();
+    let todayCount = 0;
+
+    for (const o of demo.orders) {
+      if (o.branchId !== demo.branchId) continue;
+      const tIds = new Set<string>();
+      if (o.technicianId) tIds.add(o.technicianId);
+      for (const a of o.assigneeIds) tIds.add(a);
+
+      const isAct = isActive(o.status);
+      const isDel = o.status === "DELIVERED";
+      if (isDel && o.completedAt?.slice(0, 10) === todayKey) {
+        todayCount++;
+      }
+
+      for (const tid of tIds) {
+        if (isAct) {
+          const list = act.get(tid);
+          if (list) list.push(o);
+          else act.set(tid, [o]);
+        }
+        if (isDel) {
+          const list = del.get(tid);
+          if (list) list.push(o);
+          else del.set(tid, [o]);
+        }
+      }
+    }
+    return { activeMap: act, deliveredMap: del, completedTodayCount: todayCount };
+  }, [demo.orders, demo.branchId, todayKey]);
+
+  const active = (eid: string) => activeMap.get(eid) ?? [];
+  const complete = (eid: string) => deliveredMap.get(eid) ?? [];
+
+  const branchEmployees = useMemo(
+    () => data.employees.filter((e) => e.branchId === demo.branchId),
+    [data.employees, demo.branchId],
   );
 
-  const workingTechniciansCount = branchEmployees.filter(
-    (e) => e.active && active(e.id).length > 0,
-  ).length;
-  const idleTechniciansCount = branchEmployees.filter(
-    (e) => e.active && active(e.id).length === 0,
-  ).length;
-  const completedTodayCount = demo.orders.filter(
-    (o) =>
-      o.branchId === demo.branchId &&
-      o.status === "DELIVERED" &&
-      o.completedAt?.slice(0, 10) === todayKey,
-  ).length;
+  const filteredEmployees = useMemo(() => {
+    const q = query.toLocaleLowerCase("tr").trim();
+    if (!q) return branchEmployees;
+    return branchEmployees.filter((e) =>
+      `${e.name} ${e.specialty} ${e.role}`
+        .toLocaleLowerCase("tr")
+        .includes(q),
+    );
+  }, [branchEmployees, query]);
+
+  const workingTechniciansCount = useMemo(
+    () => branchEmployees.filter((e) => e.active && (activeMap.get(e.id)?.length ?? 0) > 0).length,
+    [branchEmployees, activeMap],
+  );
+
+  const idleTechniciansCount = useMemo(
+    () => branchEmployees.filter((e) => e.active && (activeMap.get(e.id)?.length ?? 0) === 0).length,
+    [branchEmployees, activeMap],
+  );
+
+  if (id && !employee) return <Missing back="/app/team" />;
 
   return (
     <div className="module-page">

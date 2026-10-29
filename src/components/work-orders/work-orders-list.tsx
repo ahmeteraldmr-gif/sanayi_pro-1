@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   CalendarClock,
   CarFront,
@@ -78,20 +78,38 @@ export function WorkOrdersList({
   nextDay.setDate(nextDay.getDate() + 1);
   const tomorrow = isoDateFormatter.format(nextDay);
   const queryToken = normalizeSearch(query);
-  const base = orders.filter(
-    (order) => order.branchId === branchId && isActive(order.status),
+  const base = useMemo(
+    () => orders.filter((order) => order.branchId === branchId && isActive(order.status)),
+    [orders, branchId],
   );
-  const filtered = base.filter(
-    (order) =>
-      quickMatches(order, quick) &&
-      (status === "ALL" || order.status === status) &&
-      (technician === "ALL" || order.technicianId === technician) &&
-      (date === "ALL" || order.dueAt.startsWith(date)) &&
-      (!queryToken ||
-        normalizeSearch(
-          `${order.id}${vehicleFor(order).plate}${vehicleFor(order).model}${customerFor(order).name}`,
-        ).includes(queryToken)),
-  );
+
+  const filtered = useMemo(() => {
+    return base.filter((order) => {
+      if (!quickMatches(order, quick)) return false;
+      if (status !== "ALL" && order.status !== status) return false;
+      if (technician !== "ALL" && order.technicianId !== technician) return false;
+      if (date !== "ALL" && !order.dueAt.startsWith(date)) return false;
+      if (queryToken) {
+        const v = vehicleFor(order);
+        const c = customerFor(order);
+        const combined = `${order.id}${v.plate}${v.model}${c.name}`;
+        if (!normalizeSearch(combined).includes(queryToken)) return false;
+      }
+      return true;
+    });
+  }, [base, quick, status, technician, date, queryToken, vehicleFor, customerFor]);
+
+  const ordersByColumn = useMemo(() => {
+    const map = new Map<WorkOrderStatus, WorkOrder[]>();
+    for (const st of boardStatuses) {
+      map.set(st, []);
+    }
+    for (const order of filtered) {
+      const list = map.get(order.status);
+      if (list) list.push(order);
+    }
+    return map;
+  }, [filtered]);
   const hasFilters =
     quick !== "all" ||
     status !== "ALL" ||
@@ -257,33 +275,28 @@ export function WorkOrdersList({
                 {boardStatuses.map((item) => (
                   <option key={item} value={item}>
                     {statuses[item].label} (
-                    {filtered.filter((order) => order.status === item).length})
+                    {(ordersByColumn.get(item) ?? []).length})
                   </option>
                 ))}
               </select>
             </label>
             <div className="app-kanban">
-              {boardStatuses.map((column) => (
-                <section
-                  key={column}
-                  className={`app-kanban-column ${mobileColumn === column ? "is-mobile-column" : ""}`}
-                  aria-label={`${statuses[column].short} işleri`}
-                >
-                  <h2>
-                    <span
-                      className={`app-column-dot app-column-${statuses[column].tone}`}
-                    />
-                    {statuses[column].short}
-                    <span>
-                      {
-                        filtered.filter((order) => order.status === column)
-                          .length
-                      }
-                    </span>
-                  </h2>
-                  {filtered
-                    .filter((order) => order.status === column)
-                    .map((order, index) => (
+              {boardStatuses.map((column) => {
+                const columnOrders = ordersByColumn.get(column) ?? [];
+                return (
+                  <section
+                    key={column}
+                    className={`app-kanban-column ${mobileColumn === column ? "is-mobile-column" : ""}`}
+                    aria-label={`${statuses[column].short} işleri`}
+                  >
+                    <h2>
+                      <span
+                        className={`app-column-dot app-column-${statuses[column].tone}`}
+                      />
+                      {statuses[column].short}
+                      <span>{columnOrders.length}</span>
+                    </h2>
+                    {columnOrders.map((order, index) => (
                       <Link
                         href={`/app/work-orders/${order.id}`}
                         data-tour={
@@ -323,11 +336,12 @@ export function WorkOrdersList({
                         </div>
                       </Link>
                     ))}
-                  {!filtered.some((order) => order.status === column) && (
-                    <p className="app-kanban-empty">Bu aşamada iş yok.</p>
-                  )}
-                </section>
-              ))}
+                    {columnOrders.length === 0 && (
+                      <p className="app-kanban-empty">Bu aşamada iş yok.</p>
+                    )}
+                  </section>
+                );
+              })}
             </div>
             <p className="app-kanban-caption">
               Aşamalar durumları gösterir. Değişiklikleri iş emri detayından

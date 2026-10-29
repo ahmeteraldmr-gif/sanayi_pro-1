@@ -32,11 +32,26 @@ import {
   type WorkOrderStatus,
 } from "@/lib/demo-data";
 import { useDemo } from "@/components/app-shell/demo-provider";
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import dynamic from "next/dynamic";
 import { useOperations } from "@/components/modules/operations-store";
 import { QuickActions } from "@/components/app-shell/quick-actions";
-import { PlateScannerModal } from "@/components/plate-reader/plate-scanner-modal";
-import { QuickFlowDrawer } from "@/components/app-shell/quick-flow-drawer";
+
+const PlateScannerModal = dynamic(
+  () =>
+    import("@/components/plate-reader/plate-scanner-modal").then(
+      (m) => m.PlateScannerModal,
+    ),
+  { ssr: false },
+);
+
+const QuickFlowDrawer = dynamic(
+  () =>
+    import("@/components/app-shell/quick-flow-drawer").then(
+      (m) => m.QuickFlowDrawer,
+    ),
+  { ssr: false },
+);
 
 export function Dashboard() {
   const {
@@ -61,76 +76,116 @@ export function Dashboard() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerPlate, setDrawerPlate] = useState("");
   const [deskQuery, setDeskQuery] = useState("");
-  const active = orders.filter(
-    (order) => order.branchId === branchId && isActive(order.status),
+  const active = useMemo(
+    () => orders.filter((order) => order.branchId === branchId && isActive(order.status)),
+    [orders, branchId],
   );
-  const visible = active.filter(
-    (order) => filter === "ALL" || order.status === filter,
+  const visible = useMemo(
+    () => active.filter((order) => filter === "ALL" || order.status === filter),
+    [active, filter],
   );
-  const approvalOrder = active.find(
-    (order) =>
-      order.status === "AWAITING_APPROVAL" && order.approval === "PENDING",
+  const approvalOrder = useMemo(
+    () =>
+      active.find(
+        (order) =>
+          order.status === "AWAITING_APPROVAL" && order.approval === "PENDING",
+      ),
+    [active],
   );
-  const scoped = orders.filter((o) => o.branchId === branchId && o.status !== "CANCELLED");
-  const summary = {
-    collected: payments
-      .filter(
-        (p) =>
-          scoped.some((o) => o.id === p.orderId) &&
-          p.at.slice(0, 10) === new Date().toISOString().slice(0, 10),
-      )
-      .reduce((n, p) => n + p.amount, 0),
-    balance: scoped.reduce((n, o) => n + o.total - o.paid, 0),
-    revenue: scoped.filter((o) => o.status === "DELIVERED").reduce((n, o) => n + o.total, 0),
-  };
-  const shownStatuses = (
-    [
-      "IN_PROGRESS",
-      "AWAITING_APPROVAL",
-      "WAITING_PARTS",
-      "READY",
-      "RECEIVED",
-      "DIAGNOSIS",
-      "QUALITY_CONTROL",
-    ] as const
-  ).filter((status) => active.some((order) => order.status === status));
-
-  const branchTechnicians = operations.employees.filter(
-    (e) => e.branchId === branchId && e.active,
+  const scoped = useMemo(
+    () => orders.filter((o) => o.branchId === branchId && o.status !== "CANCELLED"),
+    [orders, branchId],
   );
-  const techStatusList = branchTechnicians.map((tech) => {
-    const techActiveOrders = active.filter(
-      (o) => o.technicianId === tech.id || o.assigneeIds.includes(tech.id),
-    );
-    const currentOrder = techActiveOrders[0] ?? null;
-    const currentVehicle = currentOrder ? vehicleFor(currentOrder) : null;
+  const summary = useMemo(() => {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const scopedIdSet = new Set(scoped.map((o) => o.id));
     return {
-      tech,
-      techActiveOrders,
-      currentOrder,
-      currentVehicle,
-      isBusy: techActiveOrders.length > 0,
+      collected: payments
+        .filter(
+          (p) =>
+            scopedIdSet.has(p.orderId) &&
+            p.at.slice(0, 10) === todayStr,
+        )
+        .reduce((n, p) => n + p.amount, 0),
+      balance: scoped.reduce((n, o) => n + o.total - o.paid, 0),
+      revenue: scoped.filter((o) => o.status === "DELIVERED").reduce((n, o) => n + o.total, 0),
     };
-  });
+  }, [scoped, payments]);
+
+  const shownStatuses = useMemo(
+    () =>
+      (
+        [
+          "IN_PROGRESS",
+          "AWAITING_APPROVAL",
+          "WAITING_PARTS",
+          "READY",
+          "RECEIVED",
+          "DIAGNOSIS",
+          "QUALITY_CONTROL",
+        ] as const
+      ).filter((status) => active.some((order) => order.status === status)),
+    [active],
+  );
+
+  const branchTechnicians = useMemo(
+    () => operations.employees.filter((e) => e.branchId === branchId && e.active),
+    [operations.employees, branchId],
+  );
+
+  const techStatusList = useMemo(
+    () =>
+      branchTechnicians.map((tech) => {
+        const techActiveOrders = active.filter(
+          (o) => o.technicianId === tech.id || o.assigneeIds.includes(tech.id),
+        );
+        const currentOrder = techActiveOrders[0] ?? null;
+        const currentVehicle = currentOrder ? vehicleFor(currentOrder) : null;
+        return {
+          tech,
+          techActiveOrders,
+          currentOrder,
+          currentVehicle,
+          isBusy: techActiveOrders.length > 0,
+        };
+      }),
+    [branchTechnicians, active, vehicleFor],
+  );
 
   // Usta odaklı aktif iş eşleştirmesi
-  const myTech =
-    branchTechnicians.find(
-      (t) =>
-        t.name.toLowerCase().includes("mehmet") ||
-        t.id === "mehmet" ||
-        t.role.toLowerCase().includes("usta"),
-    ) ?? branchTechnicians[0];
-
-  const myActiveOrders = active.filter(
-    (o) => o.technicianId === myTech?.id || o.assigneeIds.includes(myTech?.id),
+  const myTech = useMemo(
+    () =>
+      branchTechnicians.find(
+        (t) =>
+          t.name.toLowerCase().includes("mehmet") ||
+          t.id === "mehmet" ||
+          t.role.toLowerCase().includes("usta"),
+      ) ?? branchTechnicians[0],
+    [branchTechnicians],
   );
-  const myPrimaryOrder =
-    myActiveOrders.find((o) => o.status === "IN_PROGRESS") ??
-    myActiveOrders[0] ??
-    null;
-  const myPrimaryVehicle = myPrimaryOrder ? vehicleFor(myPrimaryOrder) : null;
-  const myPrimaryCustomer = myPrimaryOrder ? customerFor(myPrimaryOrder) : null;
+
+  const myActiveOrders = useMemo(
+    () =>
+      active.filter(
+        (o) => o.technicianId === myTech?.id || o.assigneeIds.includes(myTech?.id),
+      ),
+    [active, myTech],
+  );
+  const myPrimaryOrder = useMemo(
+    () =>
+      myActiveOrders.find((o) => o.status === "IN_PROGRESS") ??
+      myActiveOrders[0] ??
+      null,
+    [myActiveOrders],
+  );
+  const myPrimaryVehicle = useMemo(
+    () => (myPrimaryOrder ? vehicleFor(myPrimaryOrder) : null),
+    [myPrimaryOrder, vehicleFor],
+  );
+  const myPrimaryCustomer = useMemo(
+    () => (myPrimaryOrder ? customerFor(myPrimaryOrder) : null),
+    [myPrimaryOrder, customerFor],
+  );
 
   return (
     <>
