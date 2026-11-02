@@ -32,6 +32,14 @@ export function LaborEntry({ order }: { order: WorkOrder }) {
         const amount = Number(v.amount);
         if (!Number.isFinite(amount) || amount < 0 || !v.name.trim())
           return "İşlem ve tutarı kontrol edin.";
+        const prevState = {
+          labor: order.labor,
+          total: order.total,
+          quoteRevision: order.quoteRevision,
+          quoteStatus: order.quoteStatus,
+          approval: order.approval,
+          timeline: order.timeline,
+        };
         demo.updateOrder(order.id, {
           labor: [
             ...order.labor,
@@ -56,9 +64,20 @@ export function LaborEntry({ order }: { order: WorkOrder }) {
             name: v.name.trim(),
             hours: 1,
             hourlyRate: amount,
-          }).then((res) => {
-            if (!res.ok) demo.announce(res.error);
-          });
+          })
+            .then((res) => {
+              if (!res.ok) {
+                demo.updateOrder(order.id, prevState);
+                demo.announce(res.error);
+              } else {
+                demo.announce("İşçilik eklendi. Teklif revizyonu güncellendi.");
+              }
+            })
+            .catch(() => {
+              demo.updateOrder(order.id, prevState);
+              demo.announce("Sunucu bağlantısı kesildi. İşçilik kaydedilemedi.");
+            });
+          return;
         }
         demo.announce("İşçilik eklendi. Teklif revizyonu güncellendi.");
       }}
@@ -124,6 +143,16 @@ export function PartEntry({
           quantity > part.physical - part.reserved
         )
           return "Kullanılabilir stok miktarını kontrol edin.";
+        const prevParts = data.parts;
+        const prevMovements = data.movements;
+        const prevOrderState = {
+          parts: order.parts,
+          total: order.total,
+          quoteRevision: order.quoteRevision,
+          quoteStatus: order.quoteStatus,
+          approval: order.approval,
+          timeline: order.timeline,
+        };
         update((s) => ({
           ...s,
           parts: s.parts.map((p) =>
@@ -182,9 +211,22 @@ export function PartEntry({
             inventoryItemId: part.id,
             quantity,
             note: `${quantity} adet kullanıldı`,
-          }).then((res) => {
-            if (!res.ok) demo.announce(res.error);
-          });
+          })
+            .then((res) => {
+              if (!res.ok) {
+                update((s) => ({ ...s, parts: prevParts, movements: prevMovements }));
+                demo.updateOrder(order.id, prevOrderState);
+                demo.announce(res.error);
+              } else {
+                demo.announce("Parça kullanıldı.");
+              }
+            })
+            .catch(() => {
+              update((s) => ({ ...s, parts: prevParts, movements: prevMovements }));
+              demo.updateOrder(order.id, prevOrderState);
+              demo.announce("Sunucu bağlantısı kesildi. Parça kullanımı kaydedilemedi.");
+            });
+          return;
         }
         demo.announce(consumed ? "Parça kullanıldı." : "Parça ayrıldı.");
       }}
@@ -213,6 +255,12 @@ export function ConsumePart({
           demo.announce("Stok miktarını kontrol edin.");
           return;
         }
+        const prevParts = data.parts;
+        const prevMovements = data.movements;
+        const prevOrderState = {
+          parts: order.parts,
+          timeline: order.timeline,
+        };
         update((s) => ({
           ...s,
           parts: s.parts.map((p) =>
@@ -257,9 +305,22 @@ export function ConsumePart({
             inventoryItemId: partId,
             quantity: line.quantity,
             note: "Ayrılan parça kullanıldı",
-          }).then((res) => {
-            if (!res.ok) demo.announce(res.error);
-          });
+          })
+            .then((res) => {
+              if (!res.ok) {
+                update((s) => ({ ...s, parts: prevParts, movements: prevMovements }));
+                demo.updateOrder(order.id, prevOrderState);
+                demo.announce(res.error);
+              } else {
+                demo.announce("Parça kullanıldı.");
+              }
+            })
+            .catch(() => {
+              update((s) => ({ ...s, parts: prevParts, movements: prevMovements }));
+              demo.updateOrder(order.id, prevOrderState);
+              demo.announce("Sunucu bağlantısı kesildi. Parça kullanımı kaydedilemedi.");
+            });
+          return;
         }
         demo.announce("Parça kullanıldı.");
       }}

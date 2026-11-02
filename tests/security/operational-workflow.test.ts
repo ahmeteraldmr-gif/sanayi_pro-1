@@ -1273,5 +1273,104 @@ describe(
         },
       );
     });
+
+    test("Step 20: Function Security Audit (is_platform_admin, search_path, owner, EXECUTE privileges) & 2nd Session Full Readback", async () => {
+      // 1. Audit all functions in sanayipro schema
+      const fnAudit = await db.query<{
+        proname: string;
+        owner_name: string;
+        prosecdef: boolean;
+        proconfig: string[] | null;
+        public_exec: boolean;
+        runtime_exec: boolean;
+        onboarding_exec: boolean;
+      }>(
+        `SELECT p.proname,
+                pg_get_userbyid(p.proowner) AS owner_name,
+                p.prosecdef,
+                p.proconfig,
+                has_function_privilege('public', p.oid, 'EXECUTE') AS public_exec,
+                has_function_privilege('sanayipro_runtime', p.oid, 'EXECUTE') AS runtime_exec,
+                has_function_privilege('sanayipro_onboarding', p.oid, 'EXECUTE') AS onboarding_exec
+         FROM pg_proc p
+         WHERE p.pronamespace = 'sanayipro'::regnamespace
+         ORDER BY p.proname`,
+      );
+
+      assert.equal(fnAudit.rows.length, 6);
+      for (const fn of fnAudit.rows) {
+        assert.equal(fn.owner_name, "sanayipro_migrator", `${fn.proname} owner must be sanayipro_migrator`);
+        assert.equal(fn.prosecdef, false, `${fn.proname} must be SECURITY INVOKER (prosecdef=false)`);
+        assert.ok(
+          Array.isArray(fn.proconfig) && fn.proconfig.includes("search_path=pg_catalog"),
+          `${fn.proname} must lock search_path=pg_catalog`,
+        );
+        assert.equal(fn.public_exec, false, `PUBLIC must not have EXECUTE on ${fn.proname}`);
+      }
+
+      const platformAdminFn = fnAudit.rows.find((f) => f.proname === "is_platform_admin");
+      assert.ok(platformAdminFn);
+      assert.equal(platformAdminFn.runtime_exec, true);
+      assert.equal(platformAdminFn.onboarding_exec, false);
+
+      // 2. Owner A creates an active appointment, then 2nd authorized user session (viewerAUserId) reads all 20 operational tables
+      await asRuntimeActor(
+        ownerAUserId,
+        orgAId,
+        branchAId,
+        "Ahmet Yılmaz",
+        "İşletme Sahibi",
+        async (client, actor) => {
+          await createAppointment(client, actor, {
+            vehicleId: vehicleAId,
+            customerId: customerAId,
+            staffMemberId: staffTechnicianAId,
+            startsAt: "2026-11-05T10:00:00.000Z",
+            durationMinutes: 60,
+            serviceNote: "2. Oturum Okuma Test Randevusu",
+          });
+        },
+      );
+
+      await asRuntimeActor(
+        viewerAUserId,
+        orgAId,
+        branchAId,
+        "Can Danışman (2. Oturum)",
+        "Kısıtlı Gözlemci",
+        async (client) => {
+          for (const table of [
+            "customers",
+            "vehicles",
+            "staff_members",
+            "work_orders",
+            "work_order_timelines",
+            "work_order_notes",
+            "technician_assignments",
+            "work_order_labor_items",
+            "work_order_part_items",
+            "appointments",
+            "suppliers",
+            "inventory_items",
+            "inventory_movements",
+            "part_requests",
+            "quotes",
+            "quote_items",
+            "payments",
+            "expenses",
+            "fault_code_searches",
+            "vehicle_fault_records",
+          ]) {
+            const rows = await client.query<{ id: string }>(
+              `SELECT id FROM sanayipro.${table}`,
+            );
+            assert.ok(
+              rows.rows.length >= 1,
+              `2nd session must read at least 1 row from sanayipro.${table}`,
+            );
+          }
+        },
+      );
+    });
   },
 );

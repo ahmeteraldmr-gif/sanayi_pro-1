@@ -1280,7 +1280,14 @@ function DemoState({
       technicianNotes?: string;
       attachedToOrderId?: string;
     }) => {
+      if (!isDemoMode && !serverBackendReady) {
+        announce(
+          "Sunucu veritabanı bağlantısı yapılandırılmamış. Arıza sorgusu kaydedilemedi.",
+        );
+        return "";
+      }
       const id = `fault-q-${crypto.randomUUID()}`;
+      const prevHistory = faultHistory;
       setFaultHistory((current) => [
         {
           id,
@@ -1301,12 +1308,25 @@ function DemoState({
           vehiclePlate: item.vehiclePlate,
           vehicleModel: item.vehicleModel,
           technicianNotes: item.technicianNotes,
-        });
+        })
+          .then((res) => {
+            if (!res.ok) {
+              setFaultHistory(prevHistory);
+              announce(res.error);
+            } else {
+              announce("Arıza kodu sorgusu geçmişe kaydedildi.");
+            }
+          })
+          .catch(() => {
+            setFaultHistory(prevHistory);
+            announce("Sunucu bağlantısı kesildi. Arıza sorgusu kaydedilemedi.");
+          });
+        return id;
       }
       announce("Arıza kodu sorgusu geçmişe kaydedildi.");
       return id;
     },
-    [isDemoMode, serverBackendReady, setFaultHistory, announce],
+    [isDemoMode, serverBackendReady, faultHistory, setFaultHistory, announce],
   );
 
   const attachFaultToWorkOrder = useCallback(

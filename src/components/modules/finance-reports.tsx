@@ -128,6 +128,8 @@ export function FinancePage() {
           return "Geçerli bir tutar girin.";
         if (tab === "İadeler" && (!order || amount > order.paid))
           return "İade, tahsil edilen tutarı aşamaz.";
+        const prevExpenses = data.expenses;
+        const prevPaid = order?.paid;
         if (order)
           demo.updateOrder(order.id, {
             paid: Math.round((order.paid - amount) * 100) / 100,
@@ -156,9 +158,30 @@ export function FinancePage() {
             kind,
             title: v.title,
             amount,
-          }).then((res) => {
-            if (!res.ok) demo.announce(res.error);
-          });
+          })
+            .then((res) => {
+              if (!res.ok) {
+                update((s) => ({ ...s, expenses: prevExpenses }));
+                if (order && prevPaid !== undefined) {
+                  demo.updateOrder(order.id, { paid: prevPaid });
+                }
+                demo.announce(res.error);
+              } else {
+                demo.announce(
+                  tab === "İadeler" ? "İade kaydedildi." : "Gider kaydedildi.",
+                );
+              }
+            })
+            .catch(() => {
+              update((s) => ({ ...s, expenses: prevExpenses }));
+              if (order && prevPaid !== undefined) {
+                demo.updateOrder(order.id, { paid: prevPaid });
+              }
+              demo.announce(
+                "Sunucu bağlantısı kesildi. Kayıt tamamlanamadı.",
+              );
+            });
+          return;
         }
         demo.announce(
           tab === "İadeler" ? "İade kaydedildi." : "Gider kaydedildi.",

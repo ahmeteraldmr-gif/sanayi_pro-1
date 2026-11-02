@@ -324,7 +324,7 @@ describe("onboarding configuration", () => {
   test("cookie fallback is development-only", () => {
     assert.equal(localAuthEnabled({ NODE_ENV: "production" }), false);
     assert.equal(localAuthEnabled({ NODE_ENV: "production", SANAYIPRO_LOCAL_PREVIEW: "true" }), false);
-    assert.equal(localAuthEnabled({ NODE_ENV: "production", SANAYIPRO_LOCAL_PREVIEW: "1" }), true);
+    assert.equal(localAuthEnabled({ NODE_ENV: "production", SANAYIPRO_LOCAL_PREVIEW: "1" }), false);
     assert.equal(localAuthEnabled({ NODE_ENV: "development" }), true);
   });
 });

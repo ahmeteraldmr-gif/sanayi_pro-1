@@ -235,17 +235,18 @@ export function onboardingConfigured(env: Environment = process.env) {
 }
 // The cookie-based fallback exists for local development only. It is refused in
 // production builds so a missing backend can never turn into an auth bypass.
-// Whenever a real backend is configured or a production cloud environment is detected,
-// SANAYIPRO_LOCAL_PREVIEW is unconditionally refused.
+// Whenever NODE_ENV is "production", a real backend is configured, or a production
+// cloud environment is detected, SANAYIPRO_LOCAL_PREVIEW is unconditionally refused.
 export function localAuthEnabled(env: Environment = process.env) {
   if (
+    env.NODE_ENV === "production" ||
     backendConfigured(env) ||
     env.VERCEL_ENV === "production" ||
     env.SANAYIPRO_PRODUCTION_DEPLOY === "1"
   ) {
     return false;
   }
-  return env.NODE_ENV !== "production" || env.SANAYIPRO_LOCAL_PREVIEW === "1";
+  return true;
 }
 
 const rateBuckets = new Map<string, { count: number; resetAt: number }>();

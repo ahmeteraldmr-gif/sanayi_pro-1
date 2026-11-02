@@ -76,6 +76,7 @@ export function TeamPage({ id }: { id?: string }) {
       onSave={(v) => {
         if (v.name.trim().length < 2) return "Çalışan adını kontrol edin.";
         const staffId = crypto.randomUUID();
+        const prevEmployees = data.employees;
         update((s) => ({
           ...s,
           employees: [
@@ -100,9 +101,22 @@ export function TeamPage({ id }: { id?: string }) {
             specialty: v.specialty,
             phone: v.phone,
             email: v.email,
-          }).then((res) => {
-            if (!res.ok) demo.announce(res.error);
-          });
+          })
+            .then((res) => {
+              if (!res.ok) {
+                update((s) => ({ ...s, employees: prevEmployees }));
+                demo.announce(res.error);
+              } else {
+                demo.announce("Çalışan kaydedildi.");
+              }
+            })
+            .catch(() => {
+              update((s) => ({ ...s, employees: prevEmployees }));
+              demo.announce(
+                "Sunucu bağlantısı kesildi. Çalışan kaydedilemedi.",
+              );
+            });
+          return;
         }
         demo.announce("Çalışan kaydedildi.");
       }}
@@ -208,6 +222,7 @@ export function TeamPage({ id }: { id?: string }) {
                 },
               ]}
               onSave={(v) => {
+                const prevEmployees = data.employees;
                 update((s) => ({
                   ...s,
                   employees: s.employees.map((e) =>
@@ -230,9 +245,22 @@ export function TeamPage({ id }: { id?: string }) {
                     phone: v.phone,
                     email: v.email,
                     active: v.active === "Aktif",
-                  }).then((res) => {
-                    if (!res.ok) demo.announce(res.error);
-                  });
+                  })
+                    .then((res) => {
+                      if (!res.ok) {
+                        update((s) => ({ ...s, employees: prevEmployees }));
+                        demo.announce(res.error);
+                      } else {
+                        demo.announce("Çalışan güncellendi.");
+                      }
+                    })
+                    .catch(() => {
+                      update((s) => ({ ...s, employees: prevEmployees }));
+                      demo.announce(
+                        "Sunucu bağlantısı kesildi. Çalışan güncellenemedi.",
+                      );
+                    });
+                  return;
                 }
                 demo.announce("Çalışan güncellendi.");
               }}

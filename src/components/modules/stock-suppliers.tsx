@@ -91,6 +91,8 @@ export function StockEntry({
           n < (correction ? part.reserved : 1)
         )
           return "Miktarı kontrol edin. Fiziksel stok rezervasyondan az olamaz.";
+        const prevParts = data.parts;
+        const prevMovements = data.movements;
         update((s) => ({
           ...s,
           parts: s.parts.map((p) =>
@@ -115,9 +117,20 @@ export function StockEntry({
             mode: correction ? "count" : "entry",
             quantity: n,
             note: v.note || (correction ? "Sayım düzeltmesi" : "Stok girişi"),
-          }).then((res) => {
-            if (!res.ok) demo.announce(res.error);
-          });
+          })
+            .then((res) => {
+              if (!res.ok) {
+                update((s) => ({ ...s, parts: prevParts, movements: prevMovements }));
+                demo.announce(res.error);
+              } else {
+                demo.announce("Stok güncellendi.");
+              }
+            })
+            .catch(() => {
+              update((s) => ({ ...s, parts: prevParts, movements: prevMovements }));
+              demo.announce("Sunucu bağlantısı kesildi. Stok hareketi kaydedilemedi.");
+            });
+          return;
         }
         demo.announce("Stok güncellendi.");
       }}
@@ -342,6 +355,8 @@ export function StockPage({
                     supplierId: v.supplierId,
                     branchId: demo.branchId,
                   };
+                  const prevParts = data.parts;
+                  const prevMovements = data.movements;
                   update((s) => ({
                     ...s,
                     parts: [...s.parts, newPart],
@@ -365,9 +380,30 @@ export function StockPage({
                       minStockQty: newPart.minimum,
                       unitPrice: newPart.price,
                       unitCost: newPart.cost,
-                    }).then((res) => {
-                      if (!res.ok) demo.announce(res.error);
-                    });
+                    })
+                      .then((res) => {
+                        if (!res.ok) {
+                          update((s) => ({
+                            ...s,
+                            parts: prevParts,
+                            movements: prevMovements,
+                          }));
+                          demo.announce(res.error);
+                        } else {
+                          demo.announce("Parça kaydedildi.");
+                        }
+                      })
+                      .catch(() => {
+                        update((s) => ({
+                          ...s,
+                          parts: prevParts,
+                          movements: prevMovements,
+                        }));
+                        demo.announce(
+                          "Sunucu bağlantısı kesildi. Parça kaydedilemedi.",
+                        );
+                      });
+                    return;
                   }
                   demo.announce("Parça kaydedildi.");
                 }}
@@ -911,6 +947,7 @@ export function SuppliersPage({ id }: { id?: string }) {
                 phone: v.phone,
                 email: v.email,
               };
+              const prevSuppliers = data.suppliers;
               update((s) => ({
                 ...s,
                 suppliers: supplier
@@ -924,9 +961,22 @@ export function SuppliersPage({ id }: { id?: string }) {
                   contactName: entry.contact,
                   phone: entry.phone,
                   email: entry.email,
-                }).then((res) => {
-                  if (!res.ok) demo.announce(res.error);
-                });
+                })
+                  .then((res) => {
+                    if (!res.ok) {
+                      update((s) => ({ ...s, suppliers: prevSuppliers }));
+                      demo.announce(res.error);
+                    } else {
+                      demo.announce("Tedarikçi kaydedildi.");
+                    }
+                  })
+                  .catch(() => {
+                    update((s) => ({ ...s, suppliers: prevSuppliers }));
+                    demo.announce(
+                      "Sunucu bağlantısı kesildi. Tedarikçi kaydedilemedi.",
+                    );
+                  });
+                return;
               }
               demo.announce("Tedarikçi kaydedildi.");
             }}

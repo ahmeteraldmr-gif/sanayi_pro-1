@@ -49,6 +49,7 @@ function signPayload(jsonPayload: string): string {
 }
 
 export function verifySignedCookiePayload<T>(raw: string | undefined): T | null {
+  if (!localAuthEnabled()) return null;
   if (!raw) return null;
   const dotIdx = raw.lastIndexOf(".");
   if (dotIdx <= 0) return null;
@@ -223,6 +224,7 @@ export async function clearLocalSession() {
 }
 
 export async function startDemoSession(branchId: string = "motor-mekanik") {
+  if (!localAuthEnabled()) return;
   const profile = getBranchProfile(branchId);
   const demoOrgNum = 9000 + profile.order;
   const demoBranchNum = 9100 + profile.order;
