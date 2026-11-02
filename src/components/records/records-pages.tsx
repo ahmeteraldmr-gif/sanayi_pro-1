@@ -713,9 +713,18 @@ export function CustomerDetail({
   } = useDemo();
 
   const customer = customers.find((item) => item.id === id);
-  const owned = vehicles.filter((vehicle) => vehicle.customerId === id);
-  const activeVehicles = owned.filter((v) => v.active !== false);
-  const passiveVehicles = owned.filter((v) => v.active === false);
+  const owned = useMemo(
+    () => vehicles.filter((vehicle) => vehicle.customerId === id),
+    [vehicles, id],
+  );
+  const activeVehicles = useMemo(
+    () => owned.filter((v) => v.active !== false),
+    [owned],
+  );
+  const passiveVehicles = useMemo(
+    () => owned.filter((v) => v.active === false),
+    [owned],
+  );
 
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>(
     initialVehicleId || activeVehicles[0]?.id || owned[0]?.id || "",
@@ -731,32 +740,44 @@ export function CustomerDetail({
     "all" | "open-orders" | "history" | "vehicles" | "payments"
   >("all");
 
-  if (!customer) return <RecordMissing />;
-
   const activeVehicle =
     owned.find((v) => v.id === selectedVehicleId) ??
     activeVehicles[0] ??
     owned[0];
 
-  const relatedOrders = orders.filter((order) => order.customerId === id);
-  const openOrders = relatedOrders.filter((order) => isActive(order.status));
+  const relatedOrders = useMemo(
+    () => orders.filter((order) => order.customerId === id),
+    [orders, id],
+  );
+  const openOrders = useMemo(
+    () => relatedOrders.filter((order) => isActive(order.status)),
+    [relatedOrders],
+  );
   const activeOrderForSelected = activeVehicle
     ? openOrders.find((o) => o.vehicleId === activeVehicle.id)
     : openOrders[0];
 
-  const balance = relatedOrders.reduce(
-    (sum, order) =>
-      sum +
-      (order.status === "CANCELLED" ? 0 : Math.max(0, order.total - order.paid)),
-    0,
+  const balance = useMemo(
+    () =>
+      relatedOrders.reduce(
+        (sum, order) =>
+          sum +
+          (order.status === "CANCELLED" ? 0 : Math.max(0, order.total - order.paid)),
+        0,
+      ),
+    [relatedOrders],
   );
-  const totalPaid = relatedOrders.reduce(
-    (sum, order) => sum + (order.status === "CANCELLED" ? 0 : order.paid),
-    0,
+  const totalPaid = useMemo(
+    () =>
+      relatedOrders.reduce(
+        (sum, order) => sum + (order.status === "CANCELLED" ? 0 : order.paid),
+        0,
+      ),
+    [relatedOrders],
   );
 
   // Build combined service history across all of customer's vehicles
-  const serviceHistory = [
+  const serviceHistory = useMemo(() => [
     ...owned.flatMap((v) => {
       const visits = [];
       if (v.id === "v1") {
@@ -803,21 +824,28 @@ export function CustomerDetail({
           orderId: o.id,
         };
       }),
-  ];
+  ], [owned, relatedOrders]);
 
-  const customerPayments = payments.filter((p) =>
-    relatedOrders.some((o) => o.id === p.orderId),
+  const customerPayments = useMemo(
+    () =>
+      payments.filter((p) =>
+        relatedOrders.some((o) => o.id === p.orderId),
+      ),
+    [payments, relatedOrders],
   );
 
-  const selectedMileage = activeVehicle
-    ? Math.max(
-        activeVehicle.mileage ?? 0,
-        activeVehicle.lastService?.mileage ?? 0,
-        ...relatedOrders
-          .filter((o) => o.vehicleId === activeVehicle.id)
-          .map((o) => o.intakeMileage || 0),
-      )
-    : 0;
+  const selectedMileage = useMemo(() => {
+    if (!activeVehicle) return 0;
+    return Math.max(
+      activeVehicle.mileage ?? 0,
+      activeVehicle.lastService?.mileage ?? 0,
+      ...relatedOrders
+        .filter((o) => o.vehicleId === activeVehicle.id)
+        .map((o) => o.intakeMileage || 0),
+    );
+  }, [activeVehicle, relatedOrders]);
+
+  if (!customer) return <RecordMissing />;
 
   return (
     <>

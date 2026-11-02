@@ -519,6 +519,7 @@ export function HistoryTab({ order }: { order: WorkOrder }) {
   const tech = technicianFor(order.technicianId);
   const [noteText, setNoteText] = useState("");
   const [showFullTimeline, setShowFullTimeline] = useState(false);
+  const [showFullNotes, setShowFullNotes] = useState(false);
 
   function handleSendNote(e: React.FormEvent) {
     e.preventDefault();
@@ -529,7 +530,11 @@ export function HistoryTab({ order }: { order: WorkOrder }) {
 
   const timelineEntries = showFullTimeline
     ? order.timeline
-    : order.timeline.slice(-5);
+    : order.timeline.slice(-15);
+
+  const visibleNotes = showFullNotes
+    ? order.notes
+    : order.notes.slice(-15);
 
   return (
     <div className="app-history-tab">
@@ -542,12 +547,25 @@ export function HistoryTab({ order }: { order: WorkOrder }) {
               <Lock size={12} /> Yalnız personel görür
             </span>
           </div>
-          <span className="app-badge-count">{order.notes.length} not</span>
+          <div className="flex items-center gap-2">
+            <span className="app-badge-count">{order.notes.length} not</span>
+            {order.notes.length > 15 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowFullNotes(!showFullNotes)}
+              >
+                {showFullNotes
+                  ? "Son 15 Notu Göster"
+                  : `Tüm Notları Gör (${order.notes.length})`}
+              </Button>
+            )}
+          </div>
         </div>
 
         <div className="app-chat-notes-stream">
-          {order.notes.length ? (
-            order.notes.map((note) => (
+          {visibleNotes.length ? (
+            visibleNotes.map((note) => (
               <div key={note.id} className="app-chat-note-bubble">
                 <div className="app-chat-note-meta">
                   <strong className="app-chat-author">{note.author}</strong>
@@ -585,14 +603,14 @@ export function HistoryTab({ order }: { order: WorkOrder }) {
             <span className="app-summary-section-label">Zaman Çizelgesi</span>
             <History size={15} className="text-muted-foreground" />
           </div>
-          {order.timeline.length > 5 && (
+          {order.timeline.length > 15 && (
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setShowFullTimeline(!showFullTimeline)}
             >
               {showFullTimeline
-                ? "Son 5 Adımı Göster"
+                ? "Son 15 Adımı Göster"
                 : `Tüm Geçmişi Gör (${order.timeline.length})`}
             </Button>
           )}

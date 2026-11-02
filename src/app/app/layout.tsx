@@ -5,6 +5,8 @@ import { ApplicationShell } from "@/components/app-shell/application-shell";
 import { DemoProvider } from "@/components/app-shell/demo-provider";
 import "./application.css";
 import "./records.css";
+import "./calendar.css";
+import "./fault-finder.css";
 import { getVerifiedUser } from "@/server/auth";
 import { readLocalSession } from "@/server/local-auth";
 import { getTenantContext } from "@/server/tenant";
@@ -23,10 +25,14 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   let activeTenantInfo: {
+    organizationId?: string;
+    branchId?: string;
     organizationName?: string;
     branchName?: string;
     displayName?: string;
     role?: string;
+    branchSlug?: string;
+    isDemo?: boolean;
   } | null = null;
 
   if (backendConfigured()) {
@@ -36,11 +42,15 @@ export default async function AppLayout({
         | Record<string, unknown>
         | undefined;
       activeTenantInfo = {
+        organizationId: tenant.organizationId,
+        branchId: tenant.branchId,
         organizationName: tenant.organizationName,
         branchName: tenant.branchName,
         displayName:
           typeof meta?.display_name === "string" ? meta.display_name : undefined,
         role: "İşletme Sahibi",
+        branchSlug: "motor-mekanik",
+        isDemo: false,
       };
     } catch (error) {
       if (

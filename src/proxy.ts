@@ -91,6 +91,11 @@ export async function proxy(request: NextRequest) {
     return finish(response);
   }
 
+  // The platform (Super Admin) panel has no server-side role model or data source
+  // yet. With a real backend it must never be reachable, authenticated or not.
+  if (isSuperAdmin)
+    return finish(NextResponse.redirect(new URL("/app", request.url)));
+
   try {
     const { url, key } = getPublicAuthConfig();
     const client = createServerClient(url, key, {

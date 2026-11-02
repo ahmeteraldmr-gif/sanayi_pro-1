@@ -166,15 +166,18 @@ export async function clearLocalSession() {
 
 export async function startDemoSession(branchId: string = "motor-mekanik") {
   const profile = getBranchProfile(branchId);
+  const demoOrgNum = 9000 + profile.order;
+  const demoBranchNum = 9100 + profile.order;
+  const demoUserNum = 9200 + profile.order;
   await startSession({
     email: `demo.${profile.id}@sanayipro.com`,
     displayName: profile.craftsmanTitle,
     organizationName: profile.businessName,
     branchName: profile.name,
     role: "İşletme Sahibi",
-    organizationId: uuid(999),
-    branchId: uuid(9991),
-    userId: uuid(99901),
+    organizationId: uuid(demoOrgNum),
+    branchId: uuid(demoBranchNum),
+    userId: uuid(demoUserNum),
   });
 }
 
@@ -186,15 +189,23 @@ export async function readLocalSession() {
     const parsed = JSON.parse(raw) as Record<string, string>;
     const email = parsed.email || "";
     let branchSlug = "motor-mekanik";
+    let isDemo = false;
     if (email.startsWith("demo.") && email.includes("@")) {
       branchSlug = email.replace("demo.", "").split("@")[0];
+      isDemo = true;
     }
+    const profile = isDemo ? getBranchProfile(branchSlug) : null;
+    const defaultOrgId = profile ? uuid(9000 + profile.order) : uuid(1);
+    const defaultBranchId = profile ? uuid(9100 + profile.order) : uuid(11);
     return {
+      organizationId: parsed.organizationId || defaultOrgId,
+      branchId: parsed.branchId || defaultBranchId,
       organizationName: parsed.organizationName,
       branchName: parsed.branchName,
       displayName: parsed.displayName,
       role: parsed.role,
       branchSlug,
+      isDemo,
     };
   } catch {
     return null;

@@ -6842,14 +6842,18 @@ html, body {
   /* Topbar Kompakt & Temiz */
   .app-topbar {
     height: 58px;
-    padding-inline: 12px;
+    padding-inline: 8px;
+    max-width: 100vw;
+    overflow-x: hidden;
   }
   .app-brand-name {
-    font-size: 15px;
+    font-size: 14px;
   }
   .app-branch-selector select {
-    max-width: 135px;
-    font-size: 12px;
+    max-width: 105px;
+    font-size: 11px;
+    padding-left: 6px;
+    padding-right: 14px;
   }
 
   /* Hızlı İşlem Menü Kartları */

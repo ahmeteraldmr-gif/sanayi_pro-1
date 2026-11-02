@@ -218,9 +218,11 @@ const Context = createContext<{
 export function OperationsProvider({
   children,
   branchSlug,
+  operationsKey,
 }: {
   children: ReactNode;
   branchSlug?: string;
+  operationsKey?: string;
 }) {
   const initialData = useMemo(() => {
     if (!branchSlug) return initial;
@@ -283,7 +285,8 @@ export function OperationsProvider({
     };
   }, [branchSlug]);
 
-  const storageKey = branchSlug ? `operations:${branchSlug}` : "operations";
+  const storageKey =
+    operationsKey || (branchSlug ? `demo:${branchSlug}:operations` : "operations");
   const [data, update] = useLocalRepository(storageKey, initialData);
   const value = useMemo(() => ({ data, update }), [data, update]);
   return <Context.Provider value={value}>{children}</Context.Provider>;

@@ -882,10 +882,76 @@ export function normalizeSearch(value: string) {
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, "");
 }
-export function formatPlate(value: string) {
-  const normalized = normalizeSearch(value);
-  const match = normalized.match(/^(\d{2})([A-ZÇĞİÖŞÜ]{1,4})(\d{2,4})$/);
-  return match ? `${match[1]} ${match[2]} ${match[3]}` : null;
+
+export function parseAndValidatePlate(value: string): {
+  valid: boolean;
+  formatted?: string;
+  error?: string;
+} {
+  const trimmed = value ? value.trim() : "";
+  if (!trimmed) {
+    return { valid: false, error: "Araç plakasını girin (Örn: 31 ABC 123)." };
+  }
+  const normalized = normalizeSearch(trimmed);
+  // Match Turkish plates: 2 digits province + 1 to 4 letters + 2 to 5 digits
+  const match = normalized.match(/^(\d{2})([A-Z]{1,4})(\d{2,5})$/);
+  if (!match) {
+    return {
+      valid: false,
+      error: "Geçerli bir Türkiye plakası girin (Örn: 31 ABC 123, 01 AB 789).",
+    };
+  }
+  const province = parseInt(match[1], 10);
+  if (province < 1 || province > 81) {
+    return {
+      valid: false,
+      error: "İl kodu 01 ile 81 arasında olmalıdır.",
+    };
+  }
+  return { valid: true, formatted: `${match[1]} ${match[2]} ${match[3]}` };
+}
+
+export function formatPlate(value: string): string | null {
+  const res = parseAndValidatePlate(value);
+  return res.valid && res.formatted ? res.formatted : null;
+}
+
+export function parseAndValidatePhone(value: string): {
+  valid: boolean;
+  formatted?: string;
+  error?: string;
+} {
+  const trimmed = value ? value.trim() : "";
+  if (!trimmed) {
+    return { valid: false, error: "Telefon numarasını girin (Örn: 0532 555 01 42)." };
+  }
+  let digits = trimmed.replace(/\D/g, "");
+  if (digits.startsWith("90") && digits.length === 12) {
+    digits = digits.slice(2);
+  }
+  if (digits.length === 10 && /^[2-8]/.test(digits)) {
+    digits = "0" + digits;
+  }
+  if (digits.length !== 11 || !/^0[2-8]\d{9}$/.test(digits)) {
+    return {
+      valid: false,
+      error: "Geçerli bir telefon numarası girin (Örn: 0532 555 01 42).",
+    };
+  }
+  const formatted = `${digits.slice(0, 4)} ${digits.slice(4, 7)} ${digits.slice(7, 9)} ${digits.slice(9, 11)}`;
+  return { valid: true, formatted };
+}
+
+export function validateEmail(value: string): { valid: boolean; error?: string } {
+  const trimmed = value ? value.trim() : "";
+  if (!trimmed) return { valid: true };
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+    return {
+      valid: false,
+      error: "Geçerli bir e-posta adresi girin (Örn: ornek@eposta.com).",
+    };
+  }
+  return { valid: true };
 }
 
 export function defaultAppointmentTime() {

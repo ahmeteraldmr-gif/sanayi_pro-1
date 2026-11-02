@@ -6,6 +6,7 @@ import {
   useEffect,
   useMemo,
   useCallback,
+  useRef,
   useSyncExternalStore,
   type ReactNode,
 } from "react";
@@ -14,6 +15,9 @@ import {
   statuses,
   vehicles as initialVehicles,
   formatPlate,
+  parseAndValidatePlate,
+  parseAndValidatePhone,
+  validateEmail,
   normalizeSearch,
   isActive,
   money,
@@ -36,7 +40,11 @@ import {
   type NewRecordInput,
 } from "@/lib/intake-data";
 
-import { useLocalRepository } from "@/lib/local-repository";
+import {
+  useLocalRepository,
+  getStorageScope,
+  type StorageScope,
+} from "@/lib/local-repository";
 import {
   OperationsProvider,
   useOperations,
@@ -135,6 +143,9 @@ type DemoContextValue = {
     id: string;
     vehicleId: string;
     at: string;
+    durationMinutes?: number;
+    endAt?: string;
+    updatedAt?: string;
     note: string;
     branchId: BranchId;
     technicianId?: string;
@@ -145,15 +156,20 @@ type DemoContextValue = {
     at: string,
     note: string,
     technicianId?: string,
+    status?: string,
+    durationMinutes?: number,
   ) => boolean;
-  updateAppointment: (id: string, values: Record<string, string>) => void;
+  updateAppointment: (id: string, values: Record<string, unknown>) => void;
+  deleteAppointment: (id: string) => void;
   customers: readonly Customer[];
   vehicles: readonly Vehicle[];
   vehicleFor: (order: WorkOrder) => Vehicle;
   customerFor: (order: WorkOrder) => Customer;
   createRecord: (input: NewRecordInput) => {
     vehicle?: Vehicle;
+    customer?: Customer;
     error?: string;
+    field?: string;
   };
   acceptVehicle: (input: IntakeInput) => { orderId?: string; error?: string };
   orders: readonly WorkOrder[];
@@ -201,6 +217,25 @@ type DemoContextValue = {
   currentUser: DemoUser;
   activeBranchProfile: CraftsmanBranchProfile;
   switchBranch: (branchId: CraftsmanBranchId) => Promise<void>;
+  faultHistory: readonly {
+    id: string;
+    code: string;
+    queriedAt: string;
+    vehicleId?: string;
+    vehiclePlate?: string;
+    vehicleModel?: string;
+    technicianNotes?: string;
+    attachedToOrderId?: string;
+  }[];
+  saveFaultQuery: (item: {
+    code: string;
+    vehicleId?: string;
+    vehiclePlate?: string;
+    vehicleModel?: string;
+    technicianNotes?: string;
+    attachedToOrderId?: string;
+  }) => string;
+  attachFaultToWorkOrder: (orderId: string, dtcCode: string, titleTr: string, checklist: string[]) => boolean;
 };
 
 export type DemoUser = {
@@ -225,16 +260,34 @@ export function DemoProvider({
 }: {
   children: ReactNode;
   activeTenantInfo?: {
+    organizationId?: string;
+    branchId?: string;
     organizationName?: string;
     branchName?: string;
     displayName?: string;
     role?: string;
     branchSlug?: string;
+    isDemo?: boolean;
   } | null;
 }) {
+  const scope = useMemo(
+    () => getStorageScope(activeTenantInfo),
+    [activeTenantInfo],
+  );
+
   return (
-    <OperationsProvider branchSlug={activeTenantInfo?.branchSlug}>
-      <DemoState activeTenantInfo={activeTenantInfo}>{children}</DemoState>
+    <OperationsProvider
+      key={`ops-${scope.scopeId}`}
+      branchSlug={activeTenantInfo?.branchSlug}
+      operationsKey={scope.operationsKey}
+    >
+      <DemoState
+        key={`state-${scope.scopeId}`}
+        activeTenantInfo={activeTenantInfo}
+        scope={scope}
+      >
+        {children}
+      </DemoState>
     </OperationsProvider>
   );
 }
@@ -242,15 +295,20 @@ export function DemoProvider({
 function DemoState({
   children,
   activeTenantInfo,
+  scope,
 }: {
   children: ReactNode;
   activeTenantInfo?: {
+    organizationId?: string;
+    branchId?: string;
     organizationName?: string;
     branchName?: string;
     displayName?: string;
     role?: string;
     branchSlug?: string;
+    isDemo?: boolean;
   } | null;
+  scope: StorageScope;
 }) {
   const branchSlug = activeTenantInfo?.branchSlug || "motor-mekanik";
   const activeBranchProfile = useMemo(
@@ -265,10 +323,10 @@ function DemoState({
   const switchBranch = useCallback(async (newBranchId: CraftsmanBranchId) => {
     try {
       await startDemoTrialAction(newBranchId);
-    } catch (err) {
-      if (String(err).includes("NEXT_REDIRECT")) {
-        window.location.reload();
-      }
+    } finally {
+      // Force clean reload to ensure layout cookies and state re-mount cleanly
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+      window.location.href = "/app";
     }
   }, []);
 
@@ -296,23 +354,23 @@ function DemoState({
     [operations.employees],
   );
   const [customers, setCustomers] = useLocalRepository<readonly Customer[]>(
-    `branch:${activeBranchProfile.id}:customers`,
+    scope.customerKey,
     branchInitialData.customers,
   );
   const [vehicles, setVehicles] = useLocalRepository<readonly Vehicle[]>(
-    `branch:${activeBranchProfile.id}:vehicles`,
+    scope.vehicleKey,
     branchInitialData.vehicles,
   );
   const [orders, setOrders] = useLocalRepository<readonly WorkOrder[]>(
-    `branch:${activeBranchProfile.id}:orders`,
+    scope.orderKey,
     branchInitialData.orders,
   );
   const [branchId, setBranchId] = useLocalRepository<BranchId>(
-    "branch",
+    scope.branchKey,
     "dortyol",
   );
   const [, setRecent] = useLocalRepository<readonly string[]>(
-    "recent",
+    scope.recentKey,
     EMPTY_RECENT,
   );
 
@@ -331,10 +389,14 @@ function DemoState({
 
   const [demoAppointments, setAppointments] = useLocalRepository<
     DemoContextValue["demoAppointments"]
-  >(`branch:${activeBranchProfile.id}:appointments`, initialAppointments);
+  >(scope.appointmentKey, initialAppointments);
   const [payments, setPayments] = useLocalRepository<
     DemoContextValue["payments"]
-  >(`branch:${activeBranchProfile.id}:payments`, EMPTY_PAYMENTS);
+  >(scope.paymentKey, EMPTY_PAYMENTS);
+
+  const [faultHistory, setFaultHistory] = useLocalRepository<
+    DemoContextValue["faultHistory"]
+  >(scope.faultHistoryKey, []);
 
   const announce = useCallback((message: string) => {
     emitNotice(message);
@@ -378,6 +440,26 @@ function DemoState({
     return map;
   }, [operations.employees]);
 
+  const customersRef = useRef(customers);
+  const vehiclesRef = useRef(vehicles);
+  const ordersRef = useRef(orders);
+  const appointmentsRef = useRef(demoAppointments);
+  const operationsRef = useRef(operations);
+  const vehicleMapRef = useRef(vehicleMap);
+  const customerMapRef = useRef(customerMap);
+  const technicianMapRef = useRef(technicianMap);
+
+  useEffect(() => {
+    customersRef.current = customers;
+    vehiclesRef.current = vehicles;
+    ordersRef.current = orders;
+    appointmentsRef.current = demoAppointments;
+    operationsRef.current = operations;
+    vehicleMapRef.current = vehicleMap;
+    customerMapRef.current = customerMap;
+    technicianMapRef.current = technicianMap;
+  });
+
   const technicianFor = useCallback(
     (id: string) =>
       technicianMap.get(id) ?? { id, name: "Atanmadı", initials: "AT" },
@@ -385,13 +467,26 @@ function DemoState({
   );
 
   const vehicleFor = useCallback(
-    (order: WorkOrder) => vehicleMap.get(order.vehicleId) ?? vehicles[0],
-    [vehicleMap, vehicles],
+    (order: WorkOrder) =>
+      vehicleMap.get(order.vehicleId) ?? {
+        id: order.vehicleId || "unknown-vehicle",
+        plate: "Kayıtlı Araç Bulunamadı",
+        model: "Bilinmeyen Araç",
+        year: null,
+        customerId: order.customerId,
+        lastService: null,
+      },
+    [vehicleMap],
   );
 
   const customerFor = useCallback(
-    (order: WorkOrder) => customerMap.get(order.customerId) ?? customers[0],
-    [customerMap, customers],
+    (order: WorkOrder) =>
+      customerMap.get(order.customerId) ?? {
+        id: order.customerId || "unknown-customer",
+        name: "Kayıtlı Müşteri Bulunamadı",
+        phone: "—",
+      },
+    [customerMap],
   );
 
   const remember = useCallback(
@@ -425,12 +520,13 @@ function DemoState({
 
   const createCustomer = useCallback(
     (name: string, phone: string, email?: string) => {
-      if (name.trim().length < 2) return;
+      const trimmed = name.trim();
+      if (trimmed.length < 2) return;
       const normalized = phone.replace(/\D/g, "").replace(/^90/, "0");
       if (normalized && !/^0\d{10}$/.test(normalized)) return;
       if (
         normalized &&
-        customers.some((c) => c.phone.replace(/\D/g, "") === normalized)
+        customersRef.current.some((c) => c.phone.replace(/\D/g, "") === normalized)
       )
         return;
       const id = crypto.randomUUID();
@@ -438,7 +534,7 @@ function DemoState({
         ...current,
         {
           id,
-          name: name.trim(),
+          name: trimmed,
           phone: normalized,
           email: email?.trim() || undefined,
         },
@@ -446,7 +542,7 @@ function DemoState({
       announce("Müşteri kaydedildi.");
       return id;
     },
-    [customers, setCustomers, announce],
+    [setCustomers, announce],
   );
 
   const updateCustomer = useCallback(
@@ -458,7 +554,7 @@ function DemoState({
         return "Telefon numarası 11 haneli olmalıdır (05xx...).";
       if (
         normalized &&
-        customers.some(
+        customersRef.current.some(
           (c) => c.id !== id && c.phone.replace(/\D/g, "") === normalized,
         )
       )
@@ -480,18 +576,18 @@ function DemoState({
       );
       announce("Müşteri bilgileri güncellendi.");
     },
-    [customers, setCustomers, announce],
+    [setCustomers, announce],
   );
 
   const deleteCustomer = useCallback(
     (id: string) => {
-      if (orders.some((o) => o.customerId === id))
+      if (ordersRef.current.some((o) => o.customerId === id))
         return "Bu müşteriye ait iş emri bulunduğu için silinemez.";
       setVehicles((current) => current.filter((v) => v.customerId !== id));
       setCustomers((current) => current.filter((c) => c.id !== id));
       announce("Müşteri kaydı silindi.");
     },
-    [orders, setVehicles, setCustomers, announce],
+    [setVehicles, setCustomers, announce],
   );
 
   const updateVehicle = useCallback(
@@ -512,7 +608,7 @@ function DemoState({
       if (!plate)
         return "Geçerli bir plaka girin. Örnek: 31 ABC 123.";
       if (
-        vehicles.some(
+        vehiclesRef.current.some(
           (v) =>
             v.id !== id &&
             normalizeSearch(v.plate) === normalizeSearch(plate),
@@ -526,7 +622,7 @@ function DemoState({
           values.year > 2027)
       )
         return "Model yılı 1950–2027 arasında olmalı.";
-      if (!customerMap.has(values.customerId))
+      if (!customerMapRef.current.has(values.customerId))
         return "Geçerli bir müşteri seçin.";
       const brandTrim = values.brand?.trim() || "";
       const modelTrim = values.model.trim();
@@ -566,7 +662,7 @@ function DemoState({
       );
       announce("Araç bilgileri güncellendi.");
     },
-    [vehicles, customerMap, setVehicles, setOrders, announce],
+    [setVehicles, setOrders, announce],
   );
 
   const toggleVehicleActive = useCallback(
@@ -600,7 +696,7 @@ function DemoState({
       if (!plate)
         return { error: "Geçerli bir plaka girin. Örnek: 31 XYZ 456." };
       if (
-        vehicles.some(
+        vehiclesRef.current.some(
           (item) => normalizeSearch(item.plate) === normalizeSearch(plate),
         )
       ) {
@@ -648,23 +744,23 @@ function DemoState({
       );
       return { vehicle: newVehicle };
     },
-    [vehicles, setVehicles, announce],
+    [setVehicles, announce],
   );
 
   const deleteVehicle = useCallback(
     (id: string) => {
-      if (orders.some((o) => o.vehicleId === id))
+      if (ordersRef.current.some((o) => o.vehicleId === id))
         return "Bu araca ait iş emri bulunduğu için silinemez.";
       setAppointments((current) => current.filter((a) => a.vehicleId !== id));
       setVehicles((current) => current.filter((v) => v.id !== id));
       announce("Araç kaydı silindi.");
     },
-    [orders, setAppointments, setVehicles, announce],
+    [setAppointments, setVehicles, announce],
   );
 
   const assignTechnician = useCallback(
     (orderId: string, technicianId: string) => {
-      const tech = technicianMap.get(technicianId);
+      const tech = technicianMapRef.current.get(technicianId);
       if (!tech) return false;
       setOrders((current) =>
         current.map((order) => {
@@ -692,22 +788,24 @@ function DemoState({
       announce(`Sorumlu usta güncellendi: ${tech.name}.`);
       return true;
     },
-    [technicianMap, setOrders, announce],
+    [setOrders, announce],
   );
 
   const collectPayment = useCallback(
     (id: string, amount: number) => {
-      const order = orders.find((item) => item.id === id);
-      if (
-        !order ||
-        order.status === "CANCELLED" ||
-        !Number.isFinite(amount) ||
-        amount <= 0 ||
-        amount > Math.round((order.total - order.paid) * 100) / 100
-      )
-        return false;
-      setOrders((current) =>
-        current.map((item) =>
+      let success = false;
+      setOrders((current) => {
+        const order = current.find((item) => item.id === id);
+        if (
+          !order ||
+          order.status === "CANCELLED" ||
+          !Number.isFinite(amount) ||
+          amount <= 0 ||
+          amount > Math.round((order.total - order.paid) * 100) / 100
+        )
+          return current;
+        success = true;
+        return current.map((item) =>
           item.id === id
             ? {
                 ...item,
@@ -722,122 +820,287 @@ function DemoState({
                 ],
               }
             : item,
-        ),
-      );
-      setPayments((current) => [
-        ...current,
-        {
-          id: crypto.randomUUID(),
-          orderId: id,
-          amount,
-          at: new Date().toISOString(),
-        },
-      ]);
-      announce("Tahsilat kaydedildi.");
-      return true;
+        );
+      });
+      if (success) {
+        setPayments((current) => [
+          ...current,
+          {
+            id: crypto.randomUUID(),
+            orderId: id,
+            amount,
+            at: new Date().toISOString(),
+          },
+        ]);
+        announce("Tahsilat kaydedildi.");
+        return true;
+      }
+      return false;
     },
-    [orders, setOrders, setPayments, announce],
+    [setOrders, setPayments, announce],
   );
 
   const updateAppointment = useCallback(
-    (id: string, values: Record<string, string>) => {
+    (id: string, values: Record<string, unknown>) => {
       setAppointments((current) =>
-        current.map((a) => (a.id === id ? { ...a, ...values } : a)),
+        current.map((a) => {
+          if (a.id !== id) return a;
+          const updated = { ...a, ...values, updatedAt: new Date().toISOString() };
+          return updated;
+        }),
       );
       announce("Randevu güncellendi.");
     },
     [setAppointments, announce],
   );
 
+  const deleteAppointment = useCallback(
+    (id: string) => {
+      setAppointments((current) => current.filter((a) => a.id !== id));
+      announce("Randevu silindi.");
+    },
+    [setAppointments, announce],
+  );
+
   const addAppointment = useCallback(
-    (vehicleId: string, at: string, note: string, technicianId?: string) => {
+    (
+      vehicleId: string,
+      at: string,
+      note: string,
+      technicianId?: string,
+      status?: string,
+      durationMinutes?: number,
+    ) => {
       if (
-        !vehicleMap.has(vehicleId) ||
-        !Number.isFinite(Date.parse(at)) ||
-        Date.parse(at) <= Date.now()
+        !vehicleMapRef.current.has(vehicleId) ||
+        !Number.isFinite(Date.parse(at))
       )
         return false;
-      if (demoAppointments.some((a) => a.vehicleId === vehicleId && a.at === at))
+      if (
+        appointmentsRef.current.some(
+          (a) => a.vehicleId === vehicleId && a.at === at,
+        )
+      )
         return false;
+      const duration = durationMinutes && durationMinutes >= 15 ? durationMinutes : 60;
+      const startDate = new Date(at);
+      const endDate = new Date(startDate.getTime() + duration * 60000);
       setAppointments((current) => [
         ...current,
         {
           id: crypto.randomUUID(),
           vehicleId,
           at,
+          durationMinutes: duration,
+          endAt: endDate.toISOString(),
+          updatedAt: new Date().toISOString(),
           note: note.trim(),
           branchId,
-          technicianId,
-          status: "Planlandı",
+          technicianId: technicianId || undefined,
+          status: status || "Planlandı",
         },
       ]);
       announce("Randevu kaydedildi.");
       return true;
     },
-    [vehicleMap, demoAppointments, setAppointments, branchId, announce],
+    [setAppointments, branchId, announce],
+  );
+
+  const saveFaultQuery = useCallback(
+    (item: {
+      code: string;
+      vehicleId?: string;
+      vehiclePlate?: string;
+      vehicleModel?: string;
+      technicianNotes?: string;
+      attachedToOrderId?: string;
+    }) => {
+      const id = `fault-q-${crypto.randomUUID()}`;
+      setFaultHistory((current) => [
+        {
+          id,
+          code: item.code.toUpperCase(),
+          queriedAt: new Date().toISOString(),
+          vehicleId: item.vehicleId,
+          vehiclePlate: item.vehiclePlate,
+          vehicleModel: item.vehicleModel,
+          technicianNotes: item.technicianNotes,
+          attachedToOrderId: item.attachedToOrderId,
+        },
+        ...current.slice(0, 49), // Son 50 sorguyu tut
+      ]);
+      announce("Arıza kodu sorgusu geçmişe kaydedildi.");
+      return id;
+    },
+    [setFaultHistory, announce],
+  );
+
+  const attachFaultToWorkOrder = useCallback(
+    (orderId: string, dtcCode: string, titleTr: string, checklist: string[]) => {
+      const order = ordersRef.current.find((o) => o.id === orderId);
+      if (!order) return false;
+
+      const newTimelineItem = {
+        id: `h-dtc-${crypto.randomUUID()}`,
+        time: nowTimeLabel(),
+        text: `Arıza Kodu Eklendi: [${dtcCode}] ${titleTr}`,
+      };
+
+      const newNote = {
+        id: `n-dtc-${crypto.randomUUID()}`,
+        author: currentUser.name,
+        role: currentUser.role,
+        time: nowDateTimeLabel(),
+        text: `OBD-II Arıza Tespiti:\nKod: ${dtcCode} — ${titleTr}\nKontrol Sırası:\n${checklist.map((c, i) => `${i + 1}. ${c}`).join("\n")}`,
+      };
+
+      setOrders((current) =>
+        current.map((o) => {
+          if (o.id !== orderId) return o;
+          return {
+            ...o,
+            complaint: o.complaint ? `${o.complaint} (DTC: ${dtcCode})` : `DTC: ${dtcCode}`,
+            diagnosis: o.diagnosis ? `${o.diagnosis}\n[OBD: ${dtcCode}] ${titleTr}` : `[OBD: ${dtcCode}] ${titleTr}`,
+            timeline: [...o.timeline, newTimelineItem],
+            notes: [...o.notes, newNote],
+          };
+        }),
+      );
+      announce(`Arıza kodu ${orderId} iş emrine eklendi.`);
+      return true;
+    },
+    [setOrders, currentUser, announce],
   );
 
   const createRecord = useCallback(
     (input: NewRecordInput) => {
-      const plate = formatPlate(input.plate);
-      if (!plate)
-        return { error: "Geçerli bir plaka girin. Örnek: 31 ABC 123." };
+      // 1. Plaka doğrulaması
+      const plateResult = parseAndValidatePlate(input.plate);
+      if (!plateResult.valid || !plateResult.formatted) {
+        return {
+          field: "plate",
+          error: plateResult.error || "Geçerli bir plaka girin (Örn: 31 ABC 123).",
+        };
+      }
+      const plate = plateResult.formatted;
+
       if (
-        vehicles.some(
+        vehiclesRef.current.some(
           (item) => normalizeSearch(item.plate) === normalizeSearch(plate),
         )
-      )
+      ) {
         return {
+          field: "plate",
           error: "Bu plaka zaten kayıtlı. Mevcut araç kaydını seçin.",
         };
+      }
+
+      // 2. Model yılı doğrulaması
       if (
         input.year !== null &&
+        input.year !== undefined &&
         (!Number.isInteger(input.year) ||
           input.year < 1950 ||
           input.year > 2027)
-      )
-        return { error: "Model yılı giriyorsanız 1950–2027 arasında olmalı." };
+      ) {
+        return {
+          field: "year",
+          error: "Model yılı giriyorsanız 1950–2027 arasında olmalıdır.",
+        };
+      }
+
+      // 3. Kilometre doğrulaması
+      if (
+        input.mileage !== null &&
+        input.mileage !== undefined &&
+        (!Number.isFinite(input.mileage) ||
+          input.mileage < 0 ||
+          input.mileage > 2000000)
+      ) {
+        return {
+          field: "mileage",
+          error: "Kilometre 0 ile 2.000.000 arasında olmalıdır.",
+        };
+      }
+
+      // 4. Müşteri doğrulaması
       let customer = input.customerId
-        ? customerMap.get(input.customerId)
+        ? customerMapRef.current.get(input.customerId)
         : undefined;
-      if (input.customerId && !customer)
-        return { error: "Müşteri bulunamadı." };
+      if (input.customerId && !customer) {
+        return { field: "general", error: "Müşteri bulunamadı." };
+      }
+
+      let createdNewCustomer: Customer | undefined = undefined;
+
       if (!customer) {
-        const phone = input.phone.replace(/\D/g, "").replace(/^90/, "0");
-        if (input.name.trim().length < 2 || (phone && !/^0\d{10}$/.test(phone)))
+        const nameTrim = input.name?.trim() || "";
+        if (nameTrim.length < 2) {
           return {
-            error: "Müşteri adını girin. Telefon ekliyorsanız 11 haneli olmalı.",
+            field: "name",
+            error: "Müşteri adını ve soyadını girin (en az 2 karakter).",
           };
-        if (
-          phone &&
-          customers.some((item) => item.phone.replace(/\D/g, "") === phone)
-        )
+        }
+
+        const phoneResult = parseAndValidatePhone(input.phone);
+        if (!phoneResult.valid || !phoneResult.formatted) {
           return {
+            field: "phone",
             error:
-              "Bu telefonla müşteri kayıtlı. Mevcut müşteri listesinden seçin.",
+              phoneResult.error ||
+              "Geçerli bir telefon numarası girin (Örn: 0532 555 01 42).",
           };
-        customer = {
+        }
+        const formattedPhone = phoneResult.formatted;
+        const normPhone = formattedPhone.replace(/\D/g, "");
+
+        if (
+          customersRef.current.some(
+            (item) => item.phone.replace(/\D/g, "") === normPhone,
+          )
+        ) {
+          return {
+            field: "phone",
+            error:
+              "Bu telefonla kayıtlı bir müşteri zaten var. Mevcut müşteri listesinden seçin.",
+          };
+        }
+
+        const emailResult = validateEmail(input.email || "");
+        if (!emailResult.valid) {
+          return {
+            field: "email",
+            error:
+              emailResult.error ||
+              "Geçerli bir e-posta adresi girin (Örn: ornek@eposta.com).",
+          };
+        }
+
+        createdNewCustomer = {
           id: `c-${crypto.randomUUID()}`,
-          name: input.name.trim(),
-          phone,
+          name: nameTrim,
+          phone: formattedPhone,
           email: input.email?.trim() || undefined,
         };
-        setCustomers((current) => [...current, customer!]);
+        customer = createdNewCustomer;
       }
+
+      // 5. Araç kaydını hazırla
       const brandTrim = input.brand?.trim() || "";
-      const modelTrim = input.model.trim();
+      const modelTrim = input.model?.trim() || "";
       const combinedModel =
         brandTrim &&
         modelTrim &&
         !modelTrim.toLowerCase().startsWith(brandTrim.toLowerCase())
           ? `${brandTrim} ${modelTrim}`
           : modelTrim || brandTrim || "Model belirtilmedi";
+
       const vehicle: Vehicle = {
         id: `v-${crypto.randomUUID()}`,
         plate,
         brand: brandTrim || undefined,
         model: combinedModel,
-        year: input.year,
+        year: input.year ? Number(input.year) : null,
         mileage:
           input.mileage && Number.isFinite(input.mileage) && input.mileage > 0
             ? Math.round(input.mileage)
@@ -847,19 +1110,25 @@ function DemoState({
         customerId: customer.id,
         lastService: null,
       };
+
+      // 6. Atomik Kayıt (Tutarlı ve eksiksiz kayıt)
+      if (createdNewCustomer) {
+        setCustomers((current) => [...current, createdNewCustomer!]);
+      }
       setVehicles((current) => [...current, vehicle]);
-      announce("Müşteri ve araç kaydedildi.");
-      return { vehicle };
+
+      announce("Müşteri ve araç başarıyla kaydedildi.");
+      return { vehicle, customer };
     },
-    [vehicles, customerMap, customers, setCustomers, setVehicles, announce],
+    [setCustomers, setVehicles, announce],
   );
 
   const acceptVehicle = useCallback(
     (input: IntakeInput) => {
-      const vehicle = vehicleMap.get(input.vehicleId);
+      const vehicle = vehicleMapRef.current.get(input.vehicleId);
       if (!vehicle) return { error: "Önce bir araç seçin." };
       if (
-        orders.some(
+        ordersRef.current.some(
           (item) => item.vehicleId === vehicle.id && isActive(item.status),
         )
       )
@@ -883,7 +1152,7 @@ function DemoState({
           error: "Şikâyet, yakıt ve mevcut hasar bilgisini tamamlayın.",
         };
       if (
-        operations.settings.checklist !== "İsteğe bağlı" &&
+        operationsRef.current.settings.checklist !== "İsteğe bağlı" &&
         intakeChecklist.some(
           (item) => !["yes", "no", "na"].includes(input.checklist[item.id]),
         )
@@ -900,7 +1169,7 @@ function DemoState({
       const sequence =
         Math.max(
           148,
-          ...orders.map((item) => Number(item.id.split("-").at(-1)) || 0),
+          ...ordersRef.current.map((item) => Number(item.id.split("-").at(-1)) || 0),
         ) + 1;
       const id = `WO-2026-${String(sequence).padStart(5, "0")}`;
       const order: WorkOrder = {
@@ -952,20 +1221,12 @@ function DemoState({
       announce(`${vehicle.plate} için ${id} oluşturuldu.`);
       return { orderId: id };
     },
-    [
-      vehicleMap,
-      orders,
-      operations.settings.checklist,
-      technicians,
-      branchId,
-      setOrders,
-      announce,
-    ],
+    [technicians, branchId, setOrders, announce],
   );
 
   const changeStatus = useCallback(
     (id: string, status: WorkOrderStatus) => {
-      const currentOrder = orders.find((order) => order.id === id);
+      const currentOrder = ordersRef.current.find((order) => order.id === id);
       if (
         status === "DELIVERED" &&
         currentOrder &&
@@ -1040,32 +1301,40 @@ function DemoState({
       );
       announce(`Durum güncellendi: ${statuses[status].label}.`);
     },
-    [orders, setVehicles, setOrders, announce],
+    [setVehicles, setOrders, announce],
   );
 
   const quickTechnicianAction = useCallback(
     (id: string, status: WorkOrderStatus, actorName?: string) => {
-      const currentOrder = orders.find((order) => order.id === id);
-      if (!currentOrder) return false;
-      if (
-        status === "IN_PROGRESS" &&
-        currentOrder.status === "AWAITING_APPROVAL" &&
-        currentOrder.approval === "PENDING"
-      ) {
-        announce("Önce müşteri onayının kaydedilmesi gerekiyor.");
-        return false;
-      }
-      if (currentOrder.status === status) return false;
-      const actor =
-        actorName || technicianFor(currentOrder.technicianId).name || "Usta";
+      let updated = false;
+      let blockedMessage = "";
+
       const actionMap: Partial<Record<WorkOrderStatus, string>> = {
-        IN_PROGRESS: `${actor} işlemi başlattı`,
-        WAITING_PARTS: `${actor} işi beklemeye aldı (Parça Bekleniyor)`,
-        QUALITY_CONTROL: `${actor} son kontrolü başlattı`,
-        READY: `${actor} son kontrolü tamamladı · Araç hazır`,
+        IN_PROGRESS: "işlemi başlattı",
+        WAITING_PARTS: "işi beklemeye aldı (Parça Bekleniyor)",
+        QUALITY_CONTROL: "son kontrolü başlattı",
+        READY: "son kontrolü tamamladı · Araç hazır",
       };
-      setOrders((current) =>
-        current.map((order) =>
+
+      setOrders((current) => {
+        const currentOrder = current.find((order) => order.id === id);
+        if (!currentOrder || currentOrder.status === status) return current;
+
+        if (
+          status === "IN_PROGRESS" &&
+          currentOrder.status === "AWAITING_APPROVAL" &&
+          currentOrder.approval === "PENDING"
+        ) {
+          blockedMessage = "Önce müşteri onayının kaydedilmesi gerekiyor.";
+          return current;
+        }
+
+        updated = true;
+        const actor =
+          actorName || technicianFor(currentOrder.technicianId).name || "Usta";
+        const verb = actionMap[status] ?? `durumu güncelledi: ${statuses[status].label}`;
+
+        return current.map((order) =>
           order.id === id
             ? {
                 ...order,
@@ -1077,19 +1346,25 @@ function DemoState({
                   {
                     id: crypto.randomUUID(),
                     time: nowTimeLabel(),
-                    text:
-                      actionMap[status] ??
-                      `${actor} durumu güncelledi: ${statuses[status].label}`,
+                    text: `${actor} ${verb}`,
                   },
                 ],
               }
             : order,
-        ),
-      );
-      announce(`${statuses[status].label} olarak işaretlendi.`);
-      return true;
+        );
+      });
+
+      if (blockedMessage) {
+        announce(blockedMessage);
+        return false;
+      }
+      if (updated) {
+        announce(`${statuses[status].label} olarak işaretlendi.`);
+        return true;
+      }
+      return false;
     },
-    [orders, technicianFor, setOrders, announce],
+    [technicianFor, setOrders, announce],
   );
 
   const addNote = useCallback(
@@ -1447,7 +1722,7 @@ function DemoState({
 
   const updatePartRequestStatus = useCallback(
     (orderId: string, requestId: string, status: PartRequestStatus) => {
-      const targetOrder = orders.find((o) => o.id === orderId);
+      const targetOrder = ordersRef.current.find((o) => o.id === orderId);
       const targetReq = targetOrder?.partRequests?.find(
         (r) => r.id === requestId,
       );
@@ -1461,7 +1736,7 @@ function DemoState({
       } | null = null;
 
       if (status === "DELIVERED" && targetReq.partId) {
-        const stockPart = operations.parts.find(
+        const stockPart = operationsRef.current.parts.find(
           (p) => p.id === targetReq.partId,
         );
         const alreadyOnOrder = targetOrder.parts.some(
@@ -1538,7 +1813,7 @@ function DemoState({
         `Parça talebi güncellendi: ${partRequestStatuses[status].label}.`,
       );
     },
-    [orders, operations.parts, updateOperations, setOrders, announce],
+    [updateOperations, setOrders, announce],
   );
 
   const contextValue = useMemo<DemoContextValue>(
@@ -1560,6 +1835,7 @@ function DemoState({
       demoAppointments,
       addAppointment,
       updateAppointment,
+      deleteAppointment,
       customers,
       vehicles,
       vehicleFor,
@@ -1581,6 +1857,9 @@ function DemoState({
       currentUser,
       activeBranchProfile,
       switchBranch,
+      faultHistory,
+      saveFaultQuery,
+      attachFaultToWorkOrder,
       notice: "",
       announce,
     }),
@@ -1588,6 +1867,9 @@ function DemoState({
       currentUser,
       activeBranchProfile,
       switchBranch,
+      faultHistory,
+      saveFaultQuery,
+      attachFaultToWorkOrder,
       technicianFor,
       updateOrder,
       assignTechnician,
@@ -1604,6 +1886,7 @@ function DemoState({
       demoAppointments,
       addAppointment,
       updateAppointment,
+      deleteAppointment,
       customers,
       vehicles,
       vehicleFor,

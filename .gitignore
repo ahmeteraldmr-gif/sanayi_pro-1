@@ -10,3 +10,6 @@ coverage/
 .DS_Store
 .qa/
 src/generated/prisma/
+
+# generated benchmark output
+benchmark-results*.json

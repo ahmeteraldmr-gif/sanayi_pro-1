@@ -25,7 +25,6 @@ import {
 } from "@/lib/demo-data";
 import { AddNote, StatusActions } from "./order-actions";
 import { QuickActions } from "@/components/app-shell/quick-actions";
-import { findWorkOrderAcrossAllBranches } from "@/lib/branch-profiles";
 import {
   ApprovalTab,
   detailTabs,
@@ -49,8 +48,7 @@ export function WorkOrderDetail({
   const { data: operations } = useOperations();
   const activeTechnicians = operations.employees.filter((e) => e.active);
   const foundOrder = orders.find((item) => item.id.toUpperCase() === id.toUpperCase());
-  const fallback = !foundOrder ? findWorkOrderAcrossAllBranches(id) : null;
-  const order = foundOrder ?? fallback?.order;
+  const order = foundOrder;
 
   // Normalize initialTab so legacy URLs gracefully map to one of the 4 consolidated tabs
   const defaultTab: DetailTab =
@@ -81,8 +79,8 @@ export function WorkOrderDetail({
       </div>
     );
 
-  const vehicle = fallback?.vehicle ?? vehicleFor(order);
-  const customer = fallback?.customer ?? customerFor(order);
+  const vehicle = vehicleFor(order);
+  const customer = customerFor(order);
   const technician = technicianFor(order.technicianId);
   const pendingApproval = pendingApprovalAmount(order);
   const quoteStatus = effectiveQuoteStatus(order);

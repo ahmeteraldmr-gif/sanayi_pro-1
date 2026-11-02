@@ -63,7 +63,14 @@ export function IntakeWizard({
   const router = useRouter();
   const {data:operations}=useOperations();
   const technicians=operations.employees.filter(e=>e.active);
-  const { vehicles, customers, orders, branchId, acceptVehicle } = useDemo();
+  const { vehicles, customers, orders, branchId, acceptVehicle, activeBranchProfile } = useDemo();
+  const intakeTemplates = activeBranchProfile?.quickActions?.length
+    ? activeBranchProfile.quickActions.map((qa) => ({
+        id: qa.id,
+        label: qa.title,
+        desc: qa.description,
+      }))
+    : SERVICE_TEMPLATES;
   const [step, setStep] = useState(0);
   const [vehicleId, setVehicleId] = useState(initialVehicleId);
   const [query, setQuery] = useState(initialPlate);
@@ -315,7 +322,10 @@ export function IntakeWizard({
                   </div>
                   <CreateRecordForm
                     initialPlate={formatPlate(query) ?? query}
-                    onCancel={() => setCreating(false)}
+                    onCancel={() => {
+                      setCreating(false);
+                      setError("");
+                    }}
                     onCreated={(created) => {
                       selectVehicle(created.id);
                       setCreating(false);
@@ -415,7 +425,10 @@ export function IntakeWizard({
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setCreating(true)}
+                    onClick={() => {
+                      setCreating(true);
+                      setError("");
+                    }}
                   >
                     <UserRound /> Yeni Müşteri + Araç Oluştur
                   </Button>
@@ -492,7 +505,7 @@ export function IntakeWizard({
                   <Sparkles size={14} /> Sık Yapılan İşlem Şablonları (Tek Dokunuşla Seçin)
                 </label>
                 <div className="ux-template-pills-grid is-compact">
-                  {SERVICE_TEMPLATES.map((tmpl) => (
+                  {intakeTemplates.map((tmpl) => (
                     <button
                       key={tmpl.id}
                       type="button"
@@ -820,7 +833,7 @@ export function IntakeWizard({
               </section>
             </div>
           )}
-          {error && (
+          {error && !creating && (
             <p
               ref={errorRef}
               tabIndex={-1}

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useEffect, useMemo, type ReactNode } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef, memo, type ReactNode } from "react";
 import {
   ArrowUpRight,
   Bell,
@@ -95,6 +95,7 @@ const navigation = [
       { label: "Stok", icon: Package, href: "/app/stock", tourKey: "nav-stock" },
       { label: "Finans", icon: Wallet, href: "/app/finance", tourKey: "nav-finance" },
       { label: "Raporlar", icon: ChartNoAxesCombined, href: "/app/reports", tourKey: "nav-reports" },
+      { label: "Arıza Bul", icon: Search, href: "/app/fault-finder", tourKey: "nav-fault-finder" },
       { label: "Eğitim Merkezi", icon: GraduationCap, href: "/app/education", tourKey: "nav-education" },
     ],
   },
@@ -110,6 +111,7 @@ const PREFETCH_ROUTES = [
   "/app/stock",
   "/app/finance",
   "/app/reports",
+  "/app/fault-finder",
   "/app/education",
   "/app/settings",
   "/app/help",
@@ -124,7 +126,7 @@ function LiveNotice() {
   );
 }
 
-function SidebarNavigation({
+const SidebarNavigation = memo(function SidebarNavigation({
   activePath,
   onSelectPath,
   onNavigate,
@@ -234,6 +236,22 @@ function SidebarNavigation({
       </div>
     </>
   );
+});
+
+function hasUnsavedFormData(): boolean {
+  if (typeof document === "undefined") return false;
+  const inputs = document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(
+    'form input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="search"]), form textarea'
+  );
+  for (const input of inputs) {
+    if (input.closest('[data-tour="global-search"], .app-craft-switcher-modal, .search-container')) {
+      continue;
+    }
+    if (input.value && input.value.trim().length > 0 && input.value !== input.defaultValue) {
+      return true;
+    }
+  }
+  return false;
 }
 
 export function ApplicationShell({
@@ -248,6 +266,10 @@ export function ApplicationShell({
     from: string;
     to: string;
   } | null>(null);
+  const [navPending, setNavPending] = useState(false);
+  const watchdogTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const resetTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   const [menuOpen, setMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -286,16 +308,75 @@ export function ApplicationShell({
   if (prevPathname !== pathname) {
     setPrevPathname(pathname);
     setOptimisticNav(null);
+    setNavPending(false);
     setMenuOpen(false);
     setNotifOpen(false);
     setUserMenuOpen(false);
   }
 
+  useEffect(() => {
+    if (watchdogTimerRef.current) {
+      clearTimeout(watchdogTimerRef.current);
+      watchdogTimerRef.current = null;
+    }
+    if (resetTimerRef.current) {
+      clearTimeout(resetTimerRef.current);
+      resetTimerRef.current = null;
+    }
+  }, [pathname]);
+
   const effectivePath =
     optimisticNav && optimisticNav.from === pathname
       ? optimisticNav.to
       : pathname;
-  const selectPath = (to: string) => setOptimisticNav({ from: pathname, to });
+
+  const selectPath = useCallback(
+    (to: string) => {
+      if (pathname === to) {
+        return;
+      }
+
+      // Next.js Link provides pure client-side SPA navigation.
+      // We set optimistic highlight and progress bar for instant visual feedback.
+      setNavPending(true);
+      setOptimisticNav({ from: pathname, to });
+
+      // Clear any prior pending timers
+      if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current);
+      if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+
+      // Self-healing safety net (2500ms):
+      // If the route transition is delayed or cancelled, automatically reset optimisticNav and navPending.
+      // This unlocks the sidebar and releases all navigation targets without doing a destructive full reload!
+      resetTimerRef.current = setTimeout(() => {
+        setNavPending(false);
+        setOptimisticNav(null);
+      }, 2500);
+
+      // Non-destructive fallback retry (4000ms):
+      // Only as a last resort, if 4s elapse without route switch:
+      // If unsaved form data exists: NEVER RELOAD, protect user input.
+      // If no unsaved form data: Retry client-side SPA navigation via router.push.
+      watchdogTimerRef.current = setTimeout(() => {
+        if (window.location.pathname !== to) {
+          if (hasUnsavedFormData()) {
+            console.info(`[SanayiPro] Unsaved form data detected. Suppressing fallback to protect user data.`);
+          } else {
+            console.warn(`[SanayiPro] Navigation to ${to} delayed. Retrying client-side router transition.`);
+            router.push(to);
+          }
+        }
+      }, 4000);
+    },
+    [pathname, router],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current);
+      if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     remember(pathname);
@@ -315,21 +396,27 @@ export function ApplicationShell({
   useEffect(() => {
     if (typeof window === "undefined" || typeof document === "undefined") return;
 
+    let scheduled = false;
     const cleanupStuckStyles = () => {
-      const hasActiveOverlay = document.querySelector(
-        '.tour-welcome-modal, [role="dialog"][data-state="open"], .ux-drawer-backdrop.is-open',
-      );
-      if (!hasActiveOverlay) {
-        if (document.body.style.pointerEvents === "none") {
-          document.body.style.pointerEvents = "";
+      if (scheduled) return;
+      scheduled = true;
+      requestAnimationFrame(() => {
+        scheduled = false;
+        const hasActiveOverlay = document.querySelector(
+          '.tour-welcome-modal, [role="dialog"][data-state="open"], .ux-drawer-backdrop.is-open',
+        );
+        if (!hasActiveOverlay) {
+          if (document.body.style.pointerEvents === "none") {
+            document.body.style.pointerEvents = "";
+          }
+          if (document.body.style.overflow === "hidden") {
+            document.body.style.overflow = "";
+          }
+          if (document.body.hasAttribute("data-scroll-locked")) {
+            document.body.removeAttribute("data-scroll-locked");
+          }
         }
-        if (document.body.style.overflow === "hidden") {
-          document.body.style.overflow = "";
-        }
-        if (document.body.hasAttribute("data-scroll-locked")) {
-          document.body.removeAttribute("data-scroll-locked");
-        }
-      }
+      });
     };
 
     cleanupStuckStyles();
@@ -341,6 +428,42 @@ export function ApplicationShell({
       window.removeEventListener("keydown", cleanupStuckStyles, { capture: true });
     };
   }, [pathname, menuOpen, notifOpen, userMenuOpen, craftModalOpen]);
+
+  // Tab Visibility route prefetch warmup (passive, no periodic polling)
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof document === "undefined") return;
+
+    let lastActive = Date.now();
+
+    const warmUpRoutesOnReturn = () => {
+      const now = Date.now();
+      const elapsed = now - lastActive;
+      lastActive = now;
+
+      // Only refresh prefetch if tab was away or idle for more than 60 seconds
+      if (elapsed > 60000 || document.visibilityState === "visible") {
+        try {
+          router.prefetch("/app");
+          router.prefetch("/app/work-orders");
+          router.prefetch("/app/customers");
+        } catch {}
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        warmUpRoutesOnReturn();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", warmUpRoutesOnReturn);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", warmUpRoutesOnReturn);
+    };
+  }, [router]);
 
   // Warm up core application routes during idle time so first clicks are fast
   useEffect(() => {
@@ -566,6 +689,9 @@ export function ApplicationShell({
         data-local-ready={ready}
         className={`workspace ${/^\/app\/work-orders\/[^/]+/.test(pathname) ? "is-order-detail" : ""}`}
       >
+      {navPending && (
+        <div className="app-loading-bar" role="progressbar" aria-label="Sayfa yükleniyor" />
+      )}
       <a className="skip-link" href="#app-content">
         İçeriğe geç
       </a>

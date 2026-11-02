@@ -124,7 +124,7 @@ export const CRAFTSMAN_BRANCHES: CraftsmanBranchProfile[] = [
       { id: "sup-m2", name: "Akdeniz Madeni Yağ & Filtre", contact: "Bülent Yağcı", phone: "0326 614 33 44" },
     ],
     sampleOrders: [
-      { id: "WO-M01", plate: "31 ABC 123", vehicleModel: "Renault Megane 1.5 dCi", customerName: "Murat Demir", phone: "0532 111 22 33", complaint: "Motordan şıkırtı geliyor, çekiş düştü.", status: "IN_PROGRESS", stageLabel: "İşlemde", total: 16500, paid: 5000, laborName: "Triger ve Su Pompası Değişimi", partName: "Triger Seti + Devirdaim" },
+      { id: "WO-M01", plate: "31 MTR 88", vehicleModel: "Renault Megane 1.5 dCi", customerName: "Murat Demir", phone: "0532 111 22 33", complaint: "Motordan şıkırtı geliyor, çekiş düştü.", status: "IN_PROGRESS", stageLabel: "İşlemde", total: 16500, paid: 5000, laborName: "Triger ve Su Pompası Değişimi", partName: "Triger Seti + Devirdaim" },
       { id: "WO-M02", plate: "34 KRL 89", vehicleModel: "Volkswagen Passat 2.0 TDI", customerName: "Kemal Kaya", phone: "0533 222 33 44", complaint: "Su eksiltiyor, yağ kapağında beyaz köpük var.", status: "DIAGNOSIS", stageLabel: "Arıza Tespiti", total: 24000, paid: 0, laborName: "Silindir Kapak Söküm & Test", partName: "Conta Takımı" },
       { id: "WO-M03", plate: "06 VR 550", vehicleModel: "Ford Focus 1.6 Ti-VCT", customerName: "Cem Çelik", phone: "0542 333 44 55", complaint: "10.000 km periyodik yağ ve filtre bakımı.", status: "READY", stageLabel: "Teslime Hazır", total: 3200, paid: 3200, laborName: "Periyodik Bakım İşçiliği", partName: "5W-30 Motor Yağı + Filtreler" },
     ],
