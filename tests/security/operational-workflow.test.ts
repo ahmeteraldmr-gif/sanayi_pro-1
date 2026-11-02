@@ -9,17 +9,35 @@ import {
 import {
   addWorkOrderLabor,
   addWorkOrderNote,
+  addWorkOrderQuoteItem,
+  adjustInventoryStock,
   assignTechnicianToWorkOrder,
+  attachFaultRecordToWorkOrder,
   createAppointment,
   createCustomer,
   createInventoryItem,
   createStaffMember,
   createVehicle,
   createWorkOrder,
+  createWorkOrderPartRequest,
+  deleteAppointment,
+  deleteCustomer,
+  deleteVehicle,
   moveAppointment,
+  recordExpenseOrRefund,
   recordFaultCodeSearch,
   recordPayment,
+  replaceCustomerVehicle,
+  toggleVehicleActive,
+  toggleWorkOrderQuoteItemStatus,
+  updateCustomer,
+  updateStaffMember,
+  updateVehicle,
+  updateWorkOrderDetails,
+  updateWorkOrderPartRequestStatus,
+  updateWorkOrderQuoteStatus,
   updateWorkOrderStatus,
+  upsertSupplier,
   useInventoryPartOnWorkOrder,
   type OperationalActor,
   type OperationalSqlClient,
@@ -789,6 +807,469 @@ describe(
             [workOrderAId],
           );
           assert.ok(timelineCheck.rows[0].count >= 7);
+        },
+      );
+    });
+
+    test("Step 15: Full CRUD — Customer edit/delete (with FK protection), Vehicle update/toggle/replace/delete, Appointment cancel/delete, Staff update", async () => {
+      await asRuntimeActor(
+        ownerAUserId,
+        orgAId,
+        branchAId,
+        "Ahmet Yılmaz",
+        "İşletme Sahibi",
+        async (client, actor) => {
+          // 1. Update Customer A
+          const updatedCust = await updateCustomer(client, actor, {
+            customerId: customerAId,
+            fullName: "Kemal Kaya (Güncellendi)",
+            phone: "0532 411 22 33",
+            email: "kemal.yeni@example.com",
+          });
+          assert.equal(updatedCust.full_name, "Kemal Kaya (Güncellendi)");
+          assert.equal(updatedCust.email, "kemal.yeni@example.com");
+
+          // 2. Customer A has work orders -> deleteCustomer must reject with CONFLICT
+          await assert.rejects(
+            deleteCustomer(client, actor, { customerId: customerAId }),
+            (err: unknown) => err instanceof AccessError && err.code === "CONFLICT",
+          );
+
+          // 3. Create a temporary Customer & Vehicle without work orders, then delete them
+          const tempCust = await createCustomer(client, actor, {
+            fullName: "Geçici Müşteri",
+            phone: "0533 888 77 66",
+          });
+          const tempVeh = await createVehicle(client, actor, {
+            customerId: tempCust.id,
+            plate: "31 TMP 999",
+            brand: "Fiat",
+            model: "Fiat Egea",
+            year: 2021,
+            kilometer: 40000,
+          });
+          const delVehRes = await deleteVehicle(client, actor, {
+            vehicleId: tempVeh.id,
+          });
+          assert.equal(delVehRes.id, tempVeh.id);
+
+          const delCustRes = await deleteCustomer(client, actor, {
+            customerId: tempCust.id,
+          });
+          assert.equal(delCustRes.id, tempCust.id);
+
+          // 4. Vehicle A has work orders -> deleteVehicle must reject with CONFLICT
+          await assert.rejects(
+            deleteVehicle(client, actor, { vehicleId: vehicleAId }),
+            (err: unknown) => err instanceof AccessError && err.code === "CONFLICT",
+          );
+
+          // 5. Update Vehicle A, toggle active, and replace Customer A's vehicle
+          const updatedVeh = await updateVehicle(client, actor, {
+            vehicleId: vehicleAId,
+            plate: "31 KML 321",
+            brand: "Volkswagen",
+            model: "Volkswagen Passat 2.0 TDI Elegance",
+            year: 2020,
+            kilometer: 86000,
+            fuelType: "Dizel",
+          });
+          assert.equal(updatedVeh.kilometer, 86000);
+          assert.equal(updatedVeh.model, "Volkswagen Passat 2.0 TDI Elegance");
+
+          const replacedVeh = await replaceCustomerVehicle(client, actor, {
+            customerId: customerAId,
+            oldVehicleId: vehicleAId,
+            plate: "31 YEN 2026",
+            brand: "Audi",
+            model: "Audi A4 40 TDI",
+            year: 2024,
+            kilometer: 12000,
+            fuelType: "Dizel",
+          });
+          assert.equal(replacedVeh.plate, "31 YEN 2026");
+
+          const oldVehState = await client.query<{ active: boolean }>(
+            "SELECT active FROM sanayipro.vehicles WHERE id = $1",
+            [vehicleAId],
+          );
+          assert.equal(oldVehState.rows[0].active, false);
+
+          // Re-activate old vehicle
+          const reactivated = await toggleVehicleActive(client, actor, {
+            vehicleId: vehicleAId,
+            active: true,
+          });
+          assert.equal(reactivated.active, true);
+
+          // 6. Update Staff Member
+          const updatedStaff = await updateStaffMember(client, actor, {
+            staffId: staffTechnicianAId,
+            fullName: "Mehmet Usta (Başteknisyen)",
+            roleTitle: "Baş Usta",
+            specialty: "Motor & Şanzıman",
+            active: true,
+          });
+          assert.equal(updatedStaff.full_name, "Mehmet Usta (Başteknisyen)");
+
+          // 7. Cancel / Delete Appointment
+          const delAppt = await deleteAppointment(client, actor, {
+            appointmentId: appointmentAId,
+          });
+          assert.equal(delAppt.id, appointmentAId);
+        },
+      );
+    });
+
+    test("Step 16: Full CRUD — Suppliers, Stock Entry/Correction, Quotes & Quote Items, Part Requests, Expenses & Refunds, and Fault Record attachment", async () => {
+      await asRuntimeActor(
+        ownerAUserId,
+        orgAId,
+        branchAId,
+        "Ahmet Yılmaz",
+        "İşletme Sahibi",
+        async (client, actor) => {
+          // 1. Upsert Supplier (Create & Edit)
+          const supCreated = await upsertSupplier(client, actor, {
+            name: "Çukurova Oto Yedek Parça A.Ş.",
+            contactName: "Serkan Bey",
+            phone: "0326 618 00 11",
+            email: "siparis@cukurovaoto.com",
+          });
+          assert.equal(supCreated.name, "Çukurova Oto Yedek Parça A.Ş.");
+
+          const supEdited = await upsertSupplier(client, actor, {
+            id: supCreated.id,
+            name: "Çukurova Oto Parça & Ekipman A.Ş.",
+            contactName: "Serkan Kaya",
+            phone: "0326 618 00 22",
+            email: "kurumsal@cukurovaoto.com",
+          });
+          assert.equal(supEdited.id, supCreated.id);
+          assert.equal(supEdited.contact_name, "Serkan Kaya");
+
+          // 2. Stock Entry (+10) & Stock Count Correction (to 11)
+          const stockIn = await adjustInventoryStock(client, actor, {
+            inventoryItemId: inventoryItemAId,
+            mode: "entry",
+            quantity: 10,
+            note: "Tedarikçiden yeni parti girişi",
+          });
+          assert.equal(stockIn.stockQty, 13); // 3 + 10 = 13
+
+          const stockCount = await adjustInventoryStock(client, actor, {
+            inventoryItemId: inventoryItemAId,
+            mode: "count",
+            quantity: 11,
+            note: "Yıl sonu raf sayım düzeltmesi",
+          });
+          assert.equal(stockCount.stockQty, 11);
+          assert.equal(stockCount.delta, -2);
+
+          // 3. Work Order Details Update, Quote Item Add, Quote Item Toggle, Quote Status Approval
+          const updatedDetails = await updateWorkOrderDetails(client, actor, {
+            workOrderId: workOrderAId,
+            diagnosis: "Ateşleme bobini ve buji seti değişimi tamamlandı.",
+          });
+          assert.ok(updatedDetails.diagnosis.includes("Ateşleme bobini"));
+
+          const quoteItem = await addWorkOrderQuoteItem(client, actor, {
+            workOrderId: workOrderAId,
+            operation: "DSG Mekatronik Basınç Testi",
+            laborAmount: 1200,
+            inventoryItemId: inventoryItemAId,
+            partName: "Ateşleme Bobini OEM",
+            quantity: 1,
+            unitPrice: 1250,
+            note: "Orijinal parça garantili",
+          });
+          assert.equal(quoteItem.lineTotal, 2450);
+
+          const toggled = await toggleWorkOrderQuoteItemStatus(client, actor, {
+            workOrderId: workOrderAId,
+            quoteItemId: quoteItem.quoteItemId,
+            nextStatus: "APPROVED",
+          });
+          assert.equal(toggled.status, "APPROVED");
+          assert.equal(toggled.delta, 2450);
+
+          const quoteApproved = await updateWorkOrderQuoteStatus(client, actor, {
+            workOrderId: workOrderAId,
+            status: "APPROVED",
+            channel: "WhatsApp",
+          });
+          assert.equal(quoteApproved.approvalStatus, "APPROVED");
+          assert.equal(quoteApproved.grandTotal, 6450); // 4000 + 2450
+
+          // 4. Part Request Create & Status Update
+          const partReq = await createWorkOrderPartRequest(client, actor, {
+            workOrderId: workOrderAId,
+            inventoryItemId: inventoryItemAId,
+            partName: "Ateşleme Bobini OEM",
+            quantity: 1,
+            requestedBy: "Mehmet Usta",
+            note: "Acil",
+          });
+          assert.equal(partReq.status, "REQUESTED");
+
+          const partReqUpdated = await updateWorkOrderPartRequestStatus(
+            client,
+            actor,
+            {
+              workOrderId: workOrderAId,
+              requestId: partReq.id,
+              status: "DELIVERED",
+            },
+          );
+          assert.equal(partReqUpdated.status, "DELIVERED");
+
+          // 5. Attach OBD-II Fault Record to Work Order (vehicle_fault_records)
+          const attachedFault = await attachFaultRecordToWorkOrder(client, actor, {
+            workOrderId: workOrderAId,
+            dtcCode: "P0300",
+            titleTr: "Rastgele / Çoklu Silindir Tekleme Tespit Edildi",
+            checklist: [
+              "Buji ve ateşleme bobinlerini kontrol et",
+              "Enjektör balans değerlerini ölç",
+            ],
+          });
+          assert.ok(attachedFault.diagnosis.includes("P0300"));
+
+          const vfRows = await client.query<{ id: string; dtc_code: string }>(
+            "SELECT id, dtc_code FROM sanayipro.vehicle_fault_records WHERE work_order_id = $1",
+            [workOrderAId],
+          );
+          assert.equal(vfRows.rows.length, 1);
+          assert.equal(vfRows.rows[0].dtc_code, "P0300");
+
+          // 6. Record Expense & Refund (with atomic paid_amount decrement)
+          const expense = await recordExpenseOrRefund(client, actor, {
+            kind: "expense",
+            title: "Atölye Elektrik ve Kompresör Bakımı",
+            amount: 1850,
+          });
+          assert.equal(expense.kind, "expense");
+          assert.equal(Number(expense.amount), 1850);
+
+          const refund = await recordExpenseOrRefund(client, actor, {
+            kind: "refund",
+            workOrderId: workOrderAId,
+            title: "Müşteri İskonto İadesi",
+            amount: 500,
+          });
+          assert.equal(refund.kind, "refund");
+
+          const orderAfterRefund = await client.query<{ paid_amount: string }>(
+            "SELECT paid_amount::text FROM sanayipro.work_orders WHERE id = $1",
+            [workOrderAId],
+          );
+          assert.equal(Number(orderAfterRefund.rows[0].paid_amount), 3500); // 4000 - 500
+        },
+      );
+    });
+
+    test("Step 17: Cross-Tenant IDOR Defense — Organization B cannot mutate any Organization A entity via DAL functions", async () => {
+      await asRuntimeActor(
+        ownerBUserId,
+        orgBId,
+        branchBId,
+        "Burak Demir",
+        "İşletme Sahibi",
+        async (client, actor) => {
+          // Every DAL mutation targeting Organization A's IDs must fail with NOT_FOUND / FORBIDDEN / CONFLICT
+          await assert.rejects(
+            updateCustomer(client, actor, {
+              customerId: customerAId,
+              fullName: "IDOR Hack",
+              phone: "0532 111 22 33",
+            }),
+            (err: unknown) => err instanceof AccessError,
+          );
+
+          await assert.rejects(
+            deleteCustomer(client, actor, { customerId: customerAId }),
+            (err: unknown) => err instanceof AccessError,
+          );
+
+          await assert.rejects(
+            updateVehicle(client, actor, {
+              vehicleId: vehicleAId,
+              plate: "31 HCK 999",
+              model: "Hacked",
+            }),
+            (err: unknown) => err instanceof AccessError,
+          );
+
+          await assert.rejects(
+            deleteVehicle(client, actor, { vehicleId: vehicleAId }),
+            (err: unknown) => err instanceof AccessError,
+          );
+
+          await assert.rejects(
+            adjustInventoryStock(client, actor, {
+              inventoryItemId: inventoryItemAId,
+              mode: "entry",
+              quantity: 5,
+            }),
+            (err: unknown) => err instanceof AccessError,
+          );
+
+          await assert.rejects(
+            addWorkOrderQuoteItem(client, actor, {
+              workOrderId: workOrderAId,
+              operation: "IDOR Quote",
+              laborAmount: 500,
+              quantity: 1,
+              unitPrice: 0,
+            }),
+            (err: unknown) => err instanceof AccessError,
+          );
+
+          await assert.rejects(
+            recordExpenseOrRefund(client, actor, {
+              kind: "refund",
+              workOrderId: workOrderAId,
+              title: "IDOR Refund",
+              amount: 100,
+            }),
+            (err: unknown) => err instanceof AccessError,
+          );
+        },
+      );
+    });
+
+    test("Step 18: Super Admin (`sanayipro.platform_admins`) security — unauthorized users rejected, authorized Platform Admin verified", async () => {
+      const platformAdminUserId = id(9001);
+      await db.query(
+        "INSERT INTO auth.users(id) VALUES ($1) ON CONFLICT DO NOTHING",
+        [platformAdminUserId],
+      );
+
+      // 1. Regular tenant owner (ownerAUserId) is NOT a platform admin and cannot read/insert platform_admins
+      await asRuntimeActor(
+        ownerAUserId,
+        orgAId,
+        branchAId,
+        "Ahmet Yılmaz",
+        "İşletme Sahibi",
+        async (client, _actor, tx) => {
+          const isAdmin = await client.query<{ val: boolean }>(
+            "SELECT sanayipro.is_platform_admin() AS val",
+          );
+          assert.equal(isAdmin.rows[0].val, false);
+
+          const rows = await client.query("SELECT user_id FROM sanayipro.platform_admins");
+          assert.equal(rows.rows.length, 0);
+
+          await assert.rejects(
+            tx.query(
+              "INSERT INTO sanayipro.platform_admins(user_id, active) VALUES ($1, true)",
+              [ownerAUserId],
+            ),
+            /permission denied|row-level security/,
+          );
+        },
+      );
+
+      // 2. Grant platform_admin to platformAdminUserId via migrator role
+      await db.transaction(async (tx) => {
+        await tx.exec("SET LOCAL ROLE sanayipro_migrator");
+        await tx.query(
+          "INSERT INTO sanayipro.user_profiles(id, display_name, active) VALUES ($1, 'Süper Yönetici', true) ON CONFLICT DO NOTHING",
+          [platformAdminUserId],
+        );
+        await tx.query(
+          "INSERT INTO sanayipro.platform_admins(user_id, email, active) VALUES ($1, 'superadmin@sanayipro.com', true)",
+          [platformAdminUserId],
+        );
+      });
+
+      // 3. Verify platformAdminUserId has is_platform_admin() = true and can read platform_admins + organizations
+      await asRuntimeActor(
+        platformAdminUserId,
+        orgAId,
+        branchAId,
+        "Platform Admin",
+        "Super Admin",
+        async (client) => {
+          const isAdmin = await client.query<{ val: boolean }>(
+            "SELECT sanayipro.is_platform_admin() AS val",
+          );
+          assert.equal(isAdmin.rows[0].val, true);
+
+          const admins = await client.query<{ user_id: string }>(
+            "SELECT user_id FROM sanayipro.platform_admins",
+          );
+          assert.equal(admins.rows.length, 1);
+          assert.equal(admins.rows[0].user_id, platformAdminUserId);
+
+          const allOrgs = await client.query<{ id: string }>(
+            "SELECT id FROM sanayipro.organizations",
+          );
+          assert.ok(allOrgs.rows.length >= 2);
+        },
+      );
+
+      // 4. Deactivate platformAdminUserId (active = false) -> immediately loses platform admin privileges
+      await db.transaction(async (tx) => {
+        await tx.exec("SET LOCAL ROLE sanayipro_migrator");
+        await tx.query(
+          "UPDATE sanayipro.platform_admins SET active = false WHERE user_id = $1",
+          [platformAdminUserId],
+        );
+      });
+
+      await asRuntimeActor(
+        platformAdminUserId,
+        orgAId,
+        branchAId,
+        "Platform Admin",
+        "Super Admin",
+        async (client) => {
+          const isAdmin = await client.query<{ val: boolean }>(
+            "SELECT sanayipro.is_platform_admin() AS val",
+          );
+          assert.equal(isAdmin.rows[0].val, false);
+        },
+      );
+    });
+
+    test("Step 19: Transaction Rollback & Concurrency Guard — mid-transaction error leaves zero partial writes", async () => {
+      // Simulate a multi-step transaction that fails halfway through (e.g., DB error or constraint violation)
+      await assert.rejects(
+        asRuntimeActor(
+          ownerAUserId,
+          orgAId,
+          branchAId,
+          "Ahmet Yılmaz",
+          "İşletme Sahibi",
+          async (client, actor) => {
+            await createCustomer(client, actor, {
+              fullName: "Rollback Test Müşterisi",
+              phone: "0544 123 45 67",
+            });
+            // Trigger a failure inside the same transaction (overpayment conflict)
+            await recordPayment(client, actor, {
+              workOrderId: workOrderAId,
+              amount: 999999,
+            });
+          },
+        ),
+        (err: unknown) => err instanceof AccessError && err.code === "CONFLICT",
+      );
+
+      // Verify that 'Rollback Test Müşterisi' was completely rolled back
+      await asRuntimeActor(
+        ownerAUserId,
+        orgAId,
+        branchAId,
+        "Ahmet Yılmaz",
+        "İşletme Sahibi",
+        async (client) => {
+          const rolledBack = await client.query(
+            "SELECT id FROM sanayipro.customers WHERE full_name = 'Rollback Test Müşterisi'",
+          );
+          assert.equal(rolledBack.rows.length, 0);
         },
       );
     });

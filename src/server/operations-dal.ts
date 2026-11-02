@@ -4,17 +4,35 @@ import type { TenantTransaction } from "./database";
 import {
   addWorkOrderLabor,
   addWorkOrderNote,
+  addWorkOrderQuoteItem,
+  adjustInventoryStock,
   assignTechnicianToWorkOrder,
+  attachFaultRecordToWorkOrder,
   createAppointment,
   createCustomer,
   createInventoryItem,
   createStaffMember,
   createVehicle,
   createWorkOrder,
+  createWorkOrderPartRequest,
+  deleteAppointment,
+  deleteCustomer,
+  deleteVehicle,
   moveAppointment,
+  recordExpenseOrRefund,
   recordFaultCodeSearch,
   recordPayment,
+  replaceCustomerVehicle,
+  toggleVehicleActive,
+  toggleWorkOrderQuoteItemStatus,
+  updateCustomer,
+  updateStaffMember,
+  updateVehicle,
+  updateWorkOrderDetails,
+  updateWorkOrderPartRequestStatus,
+  updateWorkOrderQuoteStatus,
   updateWorkOrderStatus,
+  upsertSupplier,
   useInventoryPartOnWorkOrder,
   type OperationalActor,
   type OperationalSqlClient,
@@ -24,6 +42,8 @@ import { withTenantAuthorization } from "./tenant";
 import type {
   Customer,
   PartRequestStatus,
+  QuoteItem,
+  QuoteStatus,
   Vehicle,
   WorkOrder,
   WorkOrderStatus,
@@ -153,6 +173,10 @@ export async function loadTenantWorkspaceSnapshot(): Promise<ServerWorkspaceSnap
           laborItems: true,
           partItems: true,
           partRequests: true,
+          quotes: {
+            include: { items: true },
+            orderBy: { createdAt: "desc" },
+          },
         },
         orderBy: { createdAt: "desc" },
       }),
@@ -248,8 +272,36 @@ export async function loadTenantWorkspaceSnapshot(): Promise<ServerWorkspaceSnap
       quoteRevision: o.version,
       approval: o.approvalStatus === "APPROVED" ? "APPROVED" : "PENDING",
       approvalChannel: "Sistem",
-      quoteStatus: o.approvalStatus === "APPROVED" ? "APPROVED" : "DRAFT",
-      quoteItems: [],
+      quoteStatus: ((o.quotes[0]?.status as QuoteStatus) ||
+        (o.approvalStatus === "APPROVED" ? "APPROVED" : "DRAFT")) as QuoteStatus,
+      quoteItems: (o.quotes[0]?.items ?? []).map((qi): QuoteItem => {
+        let parsed: Record<string, unknown> = {};
+        try {
+          parsed = JSON.parse(qi.title) as Record<string, unknown>;
+        } catch {
+          parsed = { operation: qi.title };
+        }
+        const laborAmount = Number(parsed.laborAmount ?? 0);
+        const quantity = Number(parsed.quantity ?? qi.quantity ?? 1);
+        const unitPrice = Number(parsed.unitPrice ?? qi.unitPrice ?? 0);
+        return {
+          id: qi.id,
+          operation: String(parsed.operation || qi.title),
+          laborAmount,
+          partId: typeof parsed.partId === "string" ? parsed.partId : undefined,
+          partName: typeof parsed.partName === "string" ? parsed.partName : "",
+          quantity,
+          unitPrice,
+          total: Number(qi.totalPrice),
+          status:
+            parsed.status === "APPROVED"
+              ? "APPROVED"
+              : parsed.status === "REJECTED"
+                ? "REJECTED"
+                : "PENDING",
+          note: typeof parsed.note === "string" ? parsed.note : "",
+        };
+      }),
       partRequests: o.partRequests.map((pr) => ({
         id: pr.id,
         orderId: o.id,
@@ -570,6 +622,7 @@ export async function serverRecordFaultSearch(input: {
 }
 
 export async function serverCreateStaffMember(input: {
+  id?: string;
   userId?: string | null;
   fullName: string;
   roleTitle?: string;
@@ -581,3 +634,234 @@ export async function serverCreateStaffMember(input: {
     createStaffMember(prismaTxToSqlClient(tx), toActor(tenant), input),
   );
 }
+
+export async function serverCreateCustomer(input: {
+  id?: string;
+  fullName: string;
+  phone: string;
+  email?: string;
+  notes?: string;
+}) {
+  return withTenantAuthorization("customers.write", async (tx, tenant) =>
+    createCustomer(prismaTxToSqlClient(tx), toActor(tenant), input),
+  );
+}
+
+export async function serverUpdateCustomer(input: {
+  customerId: string;
+  fullName: string;
+  phone: string;
+  email?: string | null;
+  notes?: string | null;
+}) {
+  return withTenantAuthorization("customers.write", async (tx, tenant) =>
+    updateCustomer(prismaTxToSqlClient(tx), toActor(tenant), input),
+  );
+}
+
+export async function serverDeleteCustomer(input: { customerId: string }) {
+  return withTenantAuthorization("customers.write", async (tx, tenant) =>
+    deleteCustomer(prismaTxToSqlClient(tx), toActor(tenant), input),
+  );
+}
+
+export async function serverUpdateVehicle(input: {
+  vehicleId: string;
+  plate: string;
+  brand?: string;
+  model: string;
+  year?: number | null;
+  kilometer?: number | null;
+  fuelType?: string | null;
+  active?: boolean;
+}) {
+  return withTenantAuthorization("vehicles.write", async (tx, tenant) =>
+    updateVehicle(prismaTxToSqlClient(tx), toActor(tenant), input),
+  );
+}
+
+export async function serverToggleVehicleActive(input: {
+  vehicleId: string;
+  active: boolean;
+}) {
+  return withTenantAuthorization("vehicles.write", async (tx, tenant) =>
+    toggleVehicleActive(prismaTxToSqlClient(tx), toActor(tenant), input),
+  );
+}
+
+export async function serverReplaceCustomerVehicle(input: {
+  customerId: string;
+  oldVehicleId: string;
+  newVehicleId?: string;
+  plate: string;
+  brand: string;
+  model: string;
+  year?: number | null;
+  kilometer?: number | null;
+  fuelType?: string | null;
+}) {
+  return withTenantAuthorization("vehicles.write", async (tx, tenant) =>
+    replaceCustomerVehicle(prismaTxToSqlClient(tx), toActor(tenant), input),
+  );
+}
+
+export async function serverDeleteVehicle(input: { vehicleId: string }) {
+  return withTenantAuthorization("vehicles.write", async (tx, tenant) =>
+    deleteVehicle(prismaTxToSqlClient(tx), toActor(tenant), input),
+  );
+}
+
+export async function serverDeleteAppointment(input: { appointmentId: string }) {
+  return withTenantAuthorization("appointments.write", async (tx, tenant) =>
+    deleteAppointment(prismaTxToSqlClient(tx), toActor(tenant), input),
+  );
+}
+
+export async function serverUpdateWorkOrderDetails(input: {
+  workOrderId: string;
+  diagnosis?: string;
+  complaint?: string;
+  dueAt?: string | null;
+  approvalStatus?: string;
+}) {
+  return withTenantAuthorization("work_orders.write", async (tx, tenant) =>
+    updateWorkOrderDetails(prismaTxToSqlClient(tx), toActor(tenant), input),
+  );
+}
+
+export async function serverAddWorkOrderQuoteItem(input: {
+  workOrderId: string;
+  itemId?: string;
+  operation: string;
+  laborAmount: number;
+  inventoryItemId?: string | null;
+  partName?: string | null;
+  quantity: number;
+  unitPrice: number;
+  note?: string | null;
+}) {
+  return withTenantAuthorization("quotes.write", async (tx, tenant) =>
+    addWorkOrderQuoteItem(prismaTxToSqlClient(tx), toActor(tenant), input),
+  );
+}
+
+export async function serverUpdateWorkOrderQuoteStatus(input: {
+  workOrderId: string;
+  status: string;
+  channel?: string;
+}) {
+  return withTenantAuthorization("quotes.write", async (tx, tenant) =>
+    updateWorkOrderQuoteStatus(prismaTxToSqlClient(tx), toActor(tenant), input),
+  );
+}
+
+export async function serverToggleWorkOrderQuoteItemStatus(input: {
+  workOrderId: string;
+  quoteItemId: string;
+  nextStatus: "APPROVED" | "REJECTED";
+}) {
+  return withTenantAuthorization("quotes.write", async (tx, tenant) =>
+    toggleWorkOrderQuoteItemStatus(
+      prismaTxToSqlClient(tx),
+      toActor(tenant),
+      input,
+    ),
+  );
+}
+
+export async function serverCreateWorkOrderPartRequest(input: {
+  id?: string;
+  workOrderId: string;
+  inventoryItemId?: string | null;
+  partName: string;
+  quantity: number;
+  requestedBy: string;
+  note?: string | null;
+}) {
+  return withTenantAuthorization("work_orders.write", async (tx, tenant) =>
+    createWorkOrderPartRequest(prismaTxToSqlClient(tx), toActor(tenant), input),
+  );
+}
+
+export async function serverUpdateWorkOrderPartRequestStatus(input: {
+  workOrderId: string;
+  requestId: string;
+  status: string;
+}) {
+  return withTenantAuthorization("work_orders.write", async (tx, tenant) =>
+    updateWorkOrderPartRequestStatus(
+      prismaTxToSqlClient(tx),
+      toActor(tenant),
+      input,
+    ),
+  );
+}
+
+export async function serverAttachFaultRecordToWorkOrder(input: {
+  workOrderId: string;
+  dtcCode: string;
+  titleTr: string;
+  checklist: string[];
+}) {
+  return withTenantAuthorization("work_orders.write", async (tx, tenant) =>
+    attachFaultRecordToWorkOrder(
+      prismaTxToSqlClient(tx),
+      toActor(tenant),
+      input,
+    ),
+  );
+}
+
+export async function serverAdjustInventoryStock(input: {
+  inventoryItemId: string;
+  mode: "entry" | "count";
+  quantity: number;
+  unitCost?: number;
+  unitPrice?: number;
+  note?: string;
+}) {
+  return withTenantAuthorization("inventory.write", async (tx, tenant) =>
+    adjustInventoryStock(prismaTxToSqlClient(tx), toActor(tenant), input),
+  );
+}
+
+export async function serverUpsertSupplier(input: {
+  id?: string;
+  name: string;
+  contactName?: string;
+  phone?: string;
+  email?: string;
+}) {
+  return withTenantAuthorization("suppliers.write", async (tx, tenant) =>
+    upsertSupplier(prismaTxToSqlClient(tx), toActor(tenant), input),
+  );
+}
+
+export async function serverRecordExpenseOrRefund(input: {
+  id?: string;
+  workOrderId?: string | null;
+  kind: "expense" | "refund";
+  title: string;
+  amount: number;
+  category?: string;
+  note?: string;
+}) {
+  return withTenantAuthorization("finance.write", async (tx, tenant) =>
+    recordExpenseOrRefund(prismaTxToSqlClient(tx), toActor(tenant), input),
+  );
+}
+
+export async function serverUpdateStaffMember(input: {
+  staffId: string;
+  fullName: string;
+  roleTitle?: string;
+  specialty?: string;
+  phone?: string;
+  email?: string;
+  active?: boolean;
+}) {
+  return withTenantAuthorization("team.write", async (tx, tenant) =>
+    updateStaffMember(prismaTxToSqlClient(tx), toActor(tenant), input),
+  );
+}
+

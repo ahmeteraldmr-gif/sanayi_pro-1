@@ -463,6 +463,10 @@ REVOKE ALL ON sanayipro.platform_admins FROM PUBLIC;
 GRANT SELECT ON sanayipro.platform_admins TO sanayipro_runtime;
 CREATE POLICY platform_admin_self_read ON sanayipro.platform_admins FOR SELECT TO sanayipro_runtime
 USING (user_id = auth.uid() AND active);
+CREATE POLICY platform_admin_read_organizations ON sanayipro.organizations FOR SELECT TO sanayipro_runtime
+USING (sanayipro.is_platform_admin());
+CREATE POLICY platform_admin_read_branches ON sanayipro.branches FOR SELECT TO sanayipro_runtime
+USING (sanayipro.is_platform_admin());
 
 -- Enable & Force RLS + grant runtime CRUD on all 20 operational tables.
 DO $$ DECLARE table_name text; BEGIN

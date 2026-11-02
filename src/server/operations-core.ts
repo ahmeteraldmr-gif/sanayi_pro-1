@@ -1080,3 +1080,1179 @@ export async function recordFaultCodeSearch(
   }
   return rows[0];
 }
+
+export async function updateCustomer(
+  client: OperationalSqlClient,
+  actor: OperationalActor,
+  input: {
+    customerId: string;
+    fullName: string;
+    phone: string;
+    email?: string | null;
+    notes?: string | null;
+  },
+) {
+  if (!isUuid(input.customerId)) {
+    throw new AccessError("VALIDATION", 400, "Geçerli bir müşteri seçin.");
+  }
+  const fullName = cleanText(input.fullName, 120);
+  const phone = cleanText(input.phone, 32);
+  const normalizedPhone = normalizePhoneKey(phone);
+  if (fullName.length < 2 || normalizedPhone.length < 10) {
+    throw new AccessError("VALIDATION", 400, "Geçerli müşteri adı ve telefon girin.");
+  }
+  const duplicate = await client.query<{ id: string }>(
+    `SELECT id FROM sanayipro.customers
+     WHERE organization_id = $1 AND normalized_phone = $2 AND id <> $3
+     LIMIT 1`,
+    [actor.organizationId, normalizedPhone, input.customerId],
+  );
+  if (duplicate.rows.length > 0) {
+    throw new AccessError("CONFLICT", 409, "Bu telefon numarası başka bir müşteride kayıtlı.");
+  }
+  const { rows } = await client.query<{
+    id: string;
+    full_name: string;
+    phone: string;
+    normalized_phone: string;
+    email: string | null;
+  }>(
+    `UPDATE sanayipro.customers
+     SET full_name = $1,
+         phone = $2,
+         normalized_phone = $3,
+         email = $4,
+         notes = COALESCE($5, notes),
+         updated_at = now()
+     WHERE id = $6 AND organization_id = $7
+     RETURNING id, full_name, phone, normalized_phone, email`,
+    [
+      fullName,
+      phone,
+      normalizedPhone,
+      input.email ? cleanText(input.email, 160) : null,
+      input.notes !== undefined ? (input.notes ? cleanText(input.notes, 1000) : null) : null,
+      input.customerId,
+      actor.organizationId,
+    ],
+  );
+  if (!rows[0]) {
+    throw new AccessError("NOT_FOUND", 404, "Müşteri bulunamadı veya güncelleme yetkiniz yok.");
+  }
+  return rows[0];
+}
+
+export async function deleteCustomer(
+  client: OperationalSqlClient,
+  actor: OperationalActor,
+  input: { customerId: string },
+) {
+  if (!isUuid(input.customerId)) {
+    throw new AccessError("VALIDATION", 400, "Geçerli bir müşteri seçin.");
+  }
+  const hasOrders = await client.query<{ id: string }>(
+    `SELECT id FROM sanayipro.work_orders
+     WHERE organization_id = $1 AND customer_id = $2
+     LIMIT 1`,
+    [actor.organizationId, input.customerId],
+  );
+  if (hasOrders.rows.length > 0) {
+    throw new AccessError(
+      "CONFLICT",
+      409,
+      "İş emri geçmişi olan müşteri silinemez.",
+    );
+  }
+  await client.query(
+    `DELETE FROM sanayipro.appointments WHERE organization_id = $1 AND customer_id = $2`,
+    [actor.organizationId, input.customerId],
+  );
+  await client.query(
+    `DELETE FROM sanayipro.vehicles WHERE organization_id = $1 AND customer_id = $2`,
+    [actor.organizationId, input.customerId],
+  );
+  const { rows } = await client.query<{ id: string }>(
+    `DELETE FROM sanayipro.customers
+     WHERE id = $1 AND organization_id = $2
+     RETURNING id`,
+    [input.customerId, actor.organizationId],
+  );
+  if (!rows[0]) {
+    throw new AccessError("NOT_FOUND", 404, "Müşteri bulunamadı veya silme yetkiniz yok.");
+  }
+  return rows[0];
+}
+
+export async function updateVehicle(
+  client: OperationalSqlClient,
+  actor: OperationalActor,
+  input: {
+    vehicleId: string;
+    plate: string;
+    brand?: string;
+    model: string;
+    year?: number | null;
+    kilometer?: number | null;
+    fuelType?: string | null;
+    active?: boolean;
+  },
+) {
+  if (!isUuid(input.vehicleId)) {
+    throw new AccessError("VALIDATION", 400, "Geçerli bir araç seçin.");
+  }
+  const plate = cleanText(input.plate, 24).toUpperCase();
+  const normalizedPlate = normalizePlateKey(plate);
+  const model = cleanText(input.model, 120);
+  if (normalizedPlate.length < 5 || !model) {
+    throw new AccessError("VALIDATION", 400, "Geçerli plaka ve araç modeli girin.");
+  }
+  const year =
+    input.year !== null && input.year !== undefined ? Number(input.year) : null;
+  if (year !== null && (!Number.isInteger(year) || year < 1950 || year > 2100)) {
+    throw new AccessError("VALIDATION", 400, "Geçerli bir model yılı girin.");
+  }
+  const duplicate = await client.query<{ id: string }>(
+    `SELECT id FROM sanayipro.vehicles
+     WHERE organization_id = $1 AND normalized_plate = $2 AND id <> $3
+     LIMIT 1`,
+    [actor.organizationId, normalizedPlate, input.vehicleId],
+  );
+  if (duplicate.rows.length > 0) {
+    throw new AccessError("CONFLICT", 409, "Bu plaka başka bir araçta kayıtlı.");
+  }
+  const kilometer =
+    input.kilometer !== null && input.kilometer !== undefined
+      ? Math.max(0, Math.round(Number(input.kilometer)))
+      : null;
+
+  const { rows } = await client.query<{
+    id: string;
+    plate: string;
+    normalized_plate: string;
+    brand: string;
+    model: string;
+    year: number | null;
+    kilometer: number;
+    fuel_type: string | null;
+    active: boolean;
+  }>(
+    `UPDATE sanayipro.vehicles
+     SET plate = $1,
+         normalized_plate = $2,
+         brand = COALESCE($3, brand),
+         model = $4,
+         year = $5,
+         kilometer = COALESCE($6, kilometer),
+         fuel_type = COALESCE($7, fuel_type),
+         active = COALESCE($8, active),
+         updated_at = now()
+     WHERE id = $9 AND organization_id = $10
+     RETURNING id, plate, normalized_plate, brand, model, year, kilometer, fuel_type, active`,
+    [
+      plate,
+      normalizedPlate,
+      input.brand ? cleanText(input.brand, 80) : null,
+      model,
+      year,
+      kilometer,
+      input.fuelType ? cleanText(input.fuelType, 40) : null,
+      input.active !== undefined ? Boolean(input.active) : null,
+      input.vehicleId,
+      actor.organizationId,
+    ],
+  );
+  if (!rows[0]) {
+    throw new AccessError("NOT_FOUND", 404, "Araç bulunamadı veya güncelleme yetkiniz yok.");
+  }
+  return rows[0];
+}
+
+export async function toggleVehicleActive(
+  client: OperationalSqlClient,
+  actor: OperationalActor,
+  input: { vehicleId: string; active: boolean },
+) {
+  if (!isUuid(input.vehicleId)) {
+    throw new AccessError("VALIDATION", 400, "Geçerli bir araç seçin.");
+  }
+  const { rows } = await client.query<{ id: string; active: boolean }>(
+    `UPDATE sanayipro.vehicles
+     SET active = $1, updated_at = now()
+     WHERE id = $2 AND organization_id = $3
+     RETURNING id, active`,
+    [Boolean(input.active), input.vehicleId, actor.organizationId],
+  );
+  if (!rows[0]) {
+    throw new AccessError("NOT_FOUND", 404, "Araç bulunamadı.");
+  }
+  return rows[0];
+}
+
+export async function replaceCustomerVehicle(
+  client: OperationalSqlClient,
+  actor: OperationalActor,
+  input: {
+    customerId: string;
+    oldVehicleId: string;
+    newVehicleId?: string;
+    plate: string;
+    brand: string;
+    model: string;
+    year?: number | null;
+    kilometer?: number | null;
+    fuelType?: string | null;
+  },
+) {
+  if (!isUuid(input.customerId) || !isUuid(input.oldVehicleId)) {
+    throw new AccessError("VALIDATION", 400, "Geçerli müşteri ve araç seçin.");
+  }
+  await toggleVehicleActive(client, actor, {
+    vehicleId: input.oldVehicleId,
+    active: false,
+  });
+  return createVehicle(client, actor, {
+    id: input.newVehicleId,
+    customerId: input.customerId,
+    plate: input.plate,
+    brand: input.brand,
+    model: input.model,
+    year: input.year,
+    kilometer: input.kilometer,
+    fuelType: input.fuelType,
+  });
+}
+
+export async function deleteVehicle(
+  client: OperationalSqlClient,
+  actor: OperationalActor,
+  input: { vehicleId: string },
+) {
+  if (!isUuid(input.vehicleId)) {
+    throw new AccessError("VALIDATION", 400, "Geçerli bir araç seçin.");
+  }
+  const hasOrders = await client.query<{ id: string }>(
+    `SELECT id FROM sanayipro.work_orders
+     WHERE organization_id = $1 AND vehicle_id = $2
+     LIMIT 1`,
+    [actor.organizationId, input.vehicleId],
+  );
+  if (hasOrders.rows.length > 0) {
+    throw new AccessError(
+      "CONFLICT",
+      409,
+      "İş emri geçmişi olan araç silinemez.",
+    );
+  }
+  await client.query(
+    `DELETE FROM sanayipro.appointments WHERE organization_id = $1 AND vehicle_id = $2`,
+    [actor.organizationId, input.vehicleId],
+  );
+  const { rows } = await client.query<{ id: string }>(
+    `DELETE FROM sanayipro.vehicles
+     WHERE id = $1 AND organization_id = $2
+     RETURNING id`,
+    [input.vehicleId, actor.organizationId],
+  );
+  if (!rows[0]) {
+    throw new AccessError("NOT_FOUND", 404, "Araç bulunamadı veya silme yetkiniz yok.");
+  }
+  return rows[0];
+}
+
+export async function deleteAppointment(
+  client: OperationalSqlClient,
+  actor: OperationalActor,
+  input: { appointmentId: string },
+) {
+  if (!isUuid(input.appointmentId)) {
+    throw new AccessError("VALIDATION", 400, "Geçerli bir randevu seçin.");
+  }
+  const { rows } = await client.query<{ id: string }>(
+    `DELETE FROM sanayipro.appointments
+     WHERE id = $1 AND organization_id = $2 AND branch_id = $3
+     RETURNING id`,
+    [input.appointmentId, actor.organizationId, actor.branchId],
+  );
+  if (!rows[0]) {
+    throw new AccessError("NOT_FOUND", 404, "Randevu bulunamadı veya iptal yetkiniz yok.");
+  }
+  return rows[0];
+}
+
+export async function updateWorkOrderDetails(
+  client: OperationalSqlClient,
+  actor: OperationalActor,
+  input: {
+    workOrderId: string;
+    diagnosis?: string;
+    complaint?: string;
+    dueAt?: string | null;
+    approvalStatus?: string;
+  },
+) {
+  if (!isUuid(input.workOrderId)) {
+    throw new AccessError("VALIDATION", 400, "Geçerli bir iş emri seçin.");
+  }
+  const diagnosis =
+    input.diagnosis !== undefined ? cleanText(input.diagnosis, 1000) : null;
+  const complaint =
+    input.complaint !== undefined ? cleanText(input.complaint, 1000) : null;
+  const dueAtIso =
+    input.dueAt !== undefined
+      ? input.dueAt
+        ? new Date(input.dueAt).toISOString()
+        : null
+      : null;
+  const approvalStatus =
+    input.approvalStatus !== undefined
+      ? cleanText(input.approvalStatus, 32)
+      : null;
+
+  const { rows } = await client.query<{
+    id: string;
+    diagnosis: string;
+    complaint: string;
+    approval_status: string;
+  }>(
+    `UPDATE sanayipro.work_orders
+     SET diagnosis = COALESCE($1, diagnosis),
+         complaint = COALESCE($2, complaint),
+         due_at = CASE WHEN $3::boolean THEN $4::timestamptz ELSE due_at END,
+         approval_status = COALESCE($5, approval_status),
+         version = version + 1,
+         updated_at = now()
+     WHERE id = $6 AND organization_id = $7 AND branch_id = $8
+     RETURNING id, diagnosis, complaint, approval_status`,
+    [
+      diagnosis,
+      complaint,
+      input.dueAt !== undefined,
+      dueAtIso,
+      approvalStatus,
+      input.workOrderId,
+      actor.organizationId,
+      actor.branchId,
+    ],
+  );
+  if (!rows[0]) {
+    throw new AccessError("NOT_FOUND", 404, "İş emri bulunamadı.");
+  }
+  if (diagnosis) {
+    await client.query(
+      `INSERT INTO sanayipro.work_order_timelines
+         (id, organization_id, branch_id, work_order_id, actor_user_id, actor_name, event_type, description)
+       VALUES ($1, $2, $3, $4, $5, $6, 'DIAGNOSIS', $7)`,
+      [
+        randomUUID(),
+        actor.organizationId,
+        actor.branchId,
+        input.workOrderId,
+        actor.userId,
+        actor.actorName || "Usta",
+        `Ön tespit güncellendi: ${diagnosis.slice(0, 180)}`,
+      ],
+    );
+  }
+  return rows[0];
+}
+
+export async function addWorkOrderQuoteItem(
+  client: OperationalSqlClient,
+  actor: OperationalActor,
+  input: {
+    workOrderId: string;
+    itemId?: string;
+    operation: string;
+    laborAmount: number;
+    inventoryItemId?: string | null;
+    partName?: string | null;
+    quantity: number;
+    unitPrice: number;
+    note?: string | null;
+  },
+) {
+  if (!isUuid(input.workOrderId)) {
+    throw new AccessError("VALIDATION", 400, "Geçerli bir iş emri seçin.");
+  }
+  const operation = cleanText(input.operation, 200);
+  if (!operation) {
+    throw new AccessError("VALIDATION", 400, "Yapılacak işlem açıklaması zorunludur.");
+  }
+  const laborAmount = Math.max(0, Math.round(Number(input.laborAmount || 0) * 100) / 100);
+  const quantity = Math.max(1, Math.round(Number(input.quantity || 1)));
+  const unitPrice = Math.max(0, Math.round(Number(input.unitPrice || 0) * 100) / 100);
+  const partTotal = Math.round(quantity * unitPrice * 100) / 100;
+  const lineTotal = Math.round((laborAmount + partTotal) * 100) / 100;
+
+  const orderCheck = await client.query<{
+    id: string;
+    customer_id: string;
+    vehicle_id: string;
+  }>(
+    `SELECT id, customer_id, vehicle_id FROM sanayipro.work_orders
+     WHERE id = $1 AND organization_id = $2 AND branch_id = $3`,
+    [input.workOrderId, actor.organizationId, actor.branchId],
+  );
+  if (!orderCheck.rows[0]) {
+    throw new AccessError("NOT_FOUND", 404, "İş emri bulunamadı.");
+  }
+
+  const existingQuote = await client.query<{ id: string }>(
+    `SELECT id FROM sanayipro.quotes
+     WHERE work_order_id = $1 AND organization_id = $2 AND branch_id = $3
+     ORDER BY created_at DESC LIMIT 1`,
+    [input.workOrderId, actor.organizationId, actor.branchId],
+  );
+  let quoteId = existingQuote.rows[0]?.id;
+  if (!quoteId) {
+    quoteId = randomUUID();
+    const quoteNumber = `QT-${new Date().getUTCFullYear()}-${quoteId.slice(0, 6).toUpperCase()}`;
+    await client.query(
+      `INSERT INTO sanayipro.quotes
+         (id, organization_id, branch_id, work_order_id, customer_id, vehicle_id, quote_number, status, subtotal_amount, total_amount)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'PENDING_APPROVAL', 0, 0)`,
+      [
+        quoteId,
+        actor.organizationId,
+        actor.branchId,
+        input.workOrderId,
+        orderCheck.rows[0].customer_id,
+        orderCheck.rows[0].vehicle_id,
+        quoteNumber,
+      ],
+    );
+  }
+
+  const quoteItemId = input.itemId && isUuid(input.itemId) ? input.itemId : randomUUID();
+  const { rows } = await client.query<{
+    id: string;
+    title: string;
+    total_price: string;
+  }>(
+    `INSERT INTO sanayipro.quote_items
+       (id, organization_id, quote_id, item_type, title, quantity, unit_price, total_price, status)
+     VALUES ($1, $2, $3, 'COMBINED', $4, $5, $6, $7, 'PENDING')
+     RETURNING id, title, total_price::text`,
+    [
+      quoteItemId,
+      actor.organizationId,
+      quoteId,
+      JSON.stringify({
+        operation,
+        laborAmount,
+        partId: input.inventoryItemId && isUuid(input.inventoryItemId) ? input.inventoryItemId : undefined,
+        partName: input.partName ? cleanText(input.partName, 160) : undefined,
+        quantity,
+        unitPrice,
+        note: input.note ? cleanText(input.note, 300) : undefined,
+        status: "PENDING",
+      }),
+      quantity,
+      unitPrice,
+      lineTotal,
+    ],
+  );
+
+  await client.query(
+    `UPDATE sanayipro.quotes
+     SET subtotal_amount = subtotal_amount + $1,
+         total_amount = total_amount + $1,
+         status = 'PENDING_APPROVAL',
+         updated_at = now()
+     WHERE id = $2 AND organization_id = $3`,
+    [lineTotal, quoteId, actor.organizationId],
+  );
+
+  await client.query(
+    `UPDATE sanayipro.work_orders
+     SET approval_status = 'PENDING',
+         version = version + 1,
+         updated_at = now()
+     WHERE id = $1 AND organization_id = $2 AND branch_id = $3`,
+    [input.workOrderId, actor.organizationId, actor.branchId],
+  );
+
+  await client.query(
+    `INSERT INTO sanayipro.work_order_timelines
+       (id, organization_id, branch_id, work_order_id, actor_user_id, actor_name, event_type, description)
+     VALUES ($1, $2, $3, $4, $5, $6, 'QUOTE_ITEM', $7)`,
+    [
+      randomUUID(),
+      actor.organizationId,
+      actor.branchId,
+      input.workOrderId,
+      actor.userId,
+      actor.actorName || "Danışman",
+      `Teklif kalemi eklendi: ${operation} (₺${lineTotal.toFixed(2)})`,
+    ],
+  );
+
+  return { quoteId, quoteItemId: rows[0].id, lineTotal };
+}
+
+export async function updateWorkOrderQuoteStatus(
+  client: OperationalSqlClient,
+  actor: OperationalActor,
+  input: {
+    workOrderId: string;
+    status: string;
+    channel?: string;
+  },
+) {
+  if (!isUuid(input.workOrderId)) {
+    throw new AccessError("VALIDATION", 400, "Geçerli bir iş emri seçin.");
+  }
+  const status = cleanText(input.status, 40);
+  const channel = cleanText(input.channel || "Telefon", 40);
+
+  const existingQuote = await client.query<{ id: string }>(
+    `SELECT id FROM sanayipro.quotes
+     WHERE work_order_id = $1 AND organization_id = $2 AND branch_id = $3
+     ORDER BY created_at DESC LIMIT 1`,
+    [input.workOrderId, actor.organizationId, actor.branchId],
+  );
+  const quoteId = existingQuote.rows[0]?.id;
+  let approvedDelta = 0;
+
+  if (quoteId) {
+    const items = await client.query<{ id: string; title: string; total_price: string }>(
+      `SELECT id, title, total_price::text FROM sanayipro.quote_items
+       WHERE quote_id = $1 AND organization_id = $2`,
+      [quoteId, actor.organizationId],
+    );
+
+    for (const item of items.rows) {
+      let parsed: Record<string, unknown> = {};
+      try {
+        parsed = JSON.parse(item.title) as Record<string, unknown>;
+      } catch {
+        parsed = { operation: item.title, status: "PENDING" };
+      }
+      if (status === "APPROVED" && parsed.status !== "APPROVED") {
+        approvedDelta += Number(item.total_price);
+        parsed.status = "APPROVED";
+      } else if (status === "REJECTED") {
+        parsed.status = "REJECTED";
+      }
+      const nextItemStatus = String(parsed.status || "PENDING");
+      await client.query(
+        `UPDATE sanayipro.quote_items
+         SET title = $1, status = $2
+         WHERE id = $3 AND organization_id = $4`,
+        [JSON.stringify(parsed), nextItemStatus, item.id, actor.organizationId],
+      );
+    }
+
+    await client.query(
+      `UPDATE sanayipro.quotes
+       SET status = $1,
+           updated_at = now()
+       WHERE id = $2 AND organization_id = $3`,
+      [status, quoteId, actor.organizationId],
+    );
+  }
+
+  const approvalStatus =
+    status === "APPROVED" || status === "PARTIALLY_APPROVED" ? "APPROVED" : "PENDING";
+
+  const { rows } = await client.query<{
+    id: string;
+    grand_total: string;
+    approval_status: string;
+  }>(
+    `UPDATE sanayipro.work_orders
+     SET approval_status = $1,
+         labor_total = labor_total + $2,
+         grand_total = grand_total + $2,
+         version = version + 1,
+         updated_at = now()
+     WHERE id = $3 AND organization_id = $4 AND branch_id = $5
+     RETURNING id, grand_total::text, approval_status`,
+    [approvalStatus, approvedDelta, input.workOrderId, actor.organizationId, actor.branchId],
+  );
+  if (!rows[0]) {
+    throw new AccessError("NOT_FOUND", 404, "İş emri bulunamadı.");
+  }
+
+  await client.query(
+    `INSERT INTO sanayipro.work_order_timelines
+       (id, organization_id, branch_id, work_order_id, actor_user_id, actor_name, event_type, description)
+     VALUES ($1, $2, $3, $4, $5, $6, 'APPROVAL', $7)`,
+    [
+      randomUUID(),
+      actor.organizationId,
+      actor.branchId,
+      input.workOrderId,
+      actor.userId,
+      actor.actorName || "Danışman",
+      `${channel} üzerinden teklif durumu güncellendi: ${status}`,
+    ],
+  );
+
+  return {
+    workOrderId: rows[0].id,
+    approvalStatus: rows[0].approval_status,
+    grandTotal: Number(rows[0].grand_total),
+  };
+}
+
+export async function toggleWorkOrderQuoteItemStatus(
+  client: OperationalSqlClient,
+  actor: OperationalActor,
+  input: {
+    workOrderId: string;
+    quoteItemId: string;
+    nextStatus: "APPROVED" | "REJECTED";
+  },
+) {
+  if (!isUuid(input.workOrderId) || !isUuid(input.quoteItemId)) {
+    throw new AccessError("VALIDATION", 400, "Geçerli iş emri ve teklif kalemi seçin.");
+  }
+  const itemRow = await client.query<{
+    id: string;
+    quote_id: string;
+    title: string;
+    total_price: string;
+  }>(
+    `SELECT id, quote_id, title, total_price::text
+     FROM sanayipro.quote_items
+     WHERE id = $1 AND organization_id = $2`,
+    [input.quoteItemId, actor.organizationId],
+  );
+  if (!itemRow.rows[0]) {
+    throw new AccessError("NOT_FOUND", 404, "Teklif kalemi bulunamadı.");
+  }
+  let parsed: Record<string, unknown> = {};
+  try {
+    parsed = JSON.parse(itemRow.rows[0].title) as Record<string, unknown>;
+  } catch {
+    parsed = { operation: itemRow.rows[0].title, status: "PENDING_APPROVAL" };
+  }
+  const prevStatus = String(parsed.status || "PENDING_APPROVAL");
+  const totalAmount = Number(itemRow.rows[0].total_price);
+  let delta = 0;
+  if (prevStatus !== "APPROVED" && input.nextStatus === "APPROVED") {
+    delta = totalAmount;
+  } else if (prevStatus === "APPROVED" && input.nextStatus === "REJECTED") {
+    delta = -totalAmount;
+  }
+  parsed.status = input.nextStatus;
+
+  await client.query(
+    `UPDATE sanayipro.quote_items
+     SET title = $1, status = $2
+     WHERE id = $3 AND organization_id = $4`,
+    [JSON.stringify(parsed), input.nextStatus, input.quoteItemId, actor.organizationId],
+  );
+
+  await client.query(
+    `UPDATE sanayipro.work_orders
+     SET labor_total = GREATEST(0, labor_total + $1),
+         grand_total = GREATEST(0, grand_total + $1),
+         approval_status = CASE WHEN $2 = 'APPROVED' THEN 'APPROVED' ELSE approval_status END,
+         version = version + 1,
+         updated_at = now()
+     WHERE id = $3 AND organization_id = $4 AND branch_id = $5`,
+    [delta, input.nextStatus, input.workOrderId, actor.organizationId, actor.branchId],
+  );
+
+  return { quoteItemId: input.quoteItemId, status: input.nextStatus, delta };
+}
+
+export async function createWorkOrderPartRequest(
+  client: OperationalSqlClient,
+  actor: OperationalActor,
+  input: {
+    id?: string;
+    workOrderId: string;
+    inventoryItemId?: string | null;
+    partName: string;
+    quantity: number;
+    requestedBy: string;
+    note?: string | null;
+  },
+) {
+  if (!isUuid(input.workOrderId)) {
+    throw new AccessError("VALIDATION", 400, "Geçerli bir iş emri seçin.");
+  }
+  const partName = cleanText(input.partName, 160);
+  const quantity = Math.max(1, Math.round(Number(input.quantity || 1)));
+  if (!partName) {
+    throw new AccessError("VALIDATION", 400, "Parça adı zorunludur.");
+  }
+  const requestId = input.id && isUuid(input.id) ? input.id : randomUUID();
+  const { rows } = await client.query<{
+    id: string;
+    part_name: string;
+    quantity: number;
+    status: string;
+  }>(
+    `INSERT INTO sanayipro.part_requests
+       (id, organization_id, branch_id, work_order_id, inventory_item_id, part_name, quantity, requested_by, status, note)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'REQUESTED', $9)
+     RETURNING id, part_name, quantity, status`,
+    [
+      requestId,
+      actor.organizationId,
+      actor.branchId,
+      input.workOrderId,
+      input.inventoryItemId && isUuid(input.inventoryItemId) ? input.inventoryItemId : null,
+      partName,
+      quantity,
+      cleanText(input.requestedBy || actor.actorName || "Usta", 100),
+      input.note ? cleanText(input.note, 400) : null,
+    ],
+  );
+  if (!rows[0]) {
+    throw new AccessError("FORBIDDEN", 403, "Parça talebi oluşturulamadı.");
+  }
+
+  await client.query(
+    `INSERT INTO sanayipro.work_order_timelines
+       (id, organization_id, branch_id, work_order_id, actor_user_id, actor_name, event_type, description)
+     VALUES ($1, $2, $3, $4, $5, $6, 'PART_REQUEST', $7)`,
+    [
+      randomUUID(),
+      actor.organizationId,
+      actor.branchId,
+      input.workOrderId,
+      actor.userId,
+      actor.actorName || "Usta",
+      `Parça talebi oluşturuldu: ${partName} (${quantity} adet)`,
+    ],
+  );
+
+  return rows[0];
+}
+
+export async function updateWorkOrderPartRequestStatus(
+  client: OperationalSqlClient,
+  actor: OperationalActor,
+  input: {
+    workOrderId: string;
+    requestId: string;
+    status: string;
+  },
+) {
+  if (!isUuid(input.workOrderId) || !isUuid(input.requestId)) {
+    throw new AccessError("VALIDATION", 400, "Geçerli iş emri ve parça talebi seçin.");
+  }
+  const status = cleanText(input.status, 32);
+  const { rows } = await client.query<{
+    id: string;
+    part_name: string;
+    quantity: number;
+    status: string;
+  }>(
+    `UPDATE sanayipro.part_requests
+     SET status = $1, updated_at = now()
+     WHERE id = $2 AND work_order_id = $3 AND organization_id = $4 AND branch_id = $5
+     RETURNING id, part_name, quantity, status`,
+    [status, input.requestId, input.workOrderId, actor.organizationId, actor.branchId],
+  );
+  if (!rows[0]) {
+    throw new AccessError("NOT_FOUND", 404, "Parça talebi bulunamadı.");
+  }
+  await client.query(
+    `INSERT INTO sanayipro.work_order_timelines
+       (id, organization_id, branch_id, work_order_id, actor_user_id, actor_name, event_type, description)
+     VALUES ($1, $2, $3, $4, $5, $6, 'PART_REQUEST_STATUS', $7)`,
+    [
+      randomUUID(),
+      actor.organizationId,
+      actor.branchId,
+      input.workOrderId,
+      actor.userId,
+      actor.actorName || "Depo",
+      `Parça talebi güncellendi (${rows[0].part_name}): ${status}`,
+    ],
+  );
+  return rows[0];
+}
+
+export async function attachFaultRecordToWorkOrder(
+  client: OperationalSqlClient,
+  actor: OperationalActor,
+  input: {
+    workOrderId: string;
+    dtcCode: string;
+    titleTr: string;
+    checklist: string[];
+  },
+) {
+  if (!isUuid(input.workOrderId)) {
+    throw new AccessError("VALIDATION", 400, "Geçerli bir iş emri seçin.");
+  }
+  const dtcCode = cleanText(input.dtcCode, 16).toUpperCase();
+  const titleTr = cleanText(input.titleTr, 240);
+  if (!dtcCode || !titleTr) {
+    throw new AccessError("VALIDATION", 400, "Arıza kodu ve başlığı zorunludur.");
+  }
+
+  const orderRow = await client.query<{
+    id: string;
+    vehicle_id: string;
+    diagnosis: string;
+  }>(
+    `SELECT id, vehicle_id, diagnosis FROM sanayipro.work_orders
+     WHERE id = $1 AND organization_id = $2 AND branch_id = $3`,
+    [input.workOrderId, actor.organizationId, actor.branchId],
+  );
+  if (!orderRow.rows[0]) {
+    throw new AccessError("NOT_FOUND", 404, "İş emri bulunamadı.");
+  }
+
+  const faultRecordId = randomUUID();
+  const checklistText = (input.checklist || []).slice(0, 6).join(" · ");
+  await client.query(
+    `INSERT INTO sanayipro.vehicle_fault_records
+       (id, organization_id, branch_id, vehicle_id, work_order_id, dtc_code, title_tr, checklist_json, status, technician_notes)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'OPEN', $9)`,
+    [
+      faultRecordId,
+      actor.organizationId,
+      actor.branchId,
+      orderRow.rows[0].vehicle_id,
+      input.workOrderId,
+      dtcCode,
+      titleTr,
+      JSON.stringify(input.checklist || []),
+      `${titleTr}${checklistText ? ` — Kontrol: ${checklistText}` : ""}`,
+    ],
+  );
+
+  const curDiag = orderRow.rows[0].diagnosis || "";
+  const nextDiag = curDiag.includes(dtcCode)
+    ? curDiag
+    : `${curDiag ? `${curDiag} · ` : ""}[OBD ${dtcCode}] ${titleTr}`;
+
+  await client.query(
+    `UPDATE sanayipro.work_orders
+     SET diagnosis = $1, version = version + 1, updated_at = now()
+     WHERE id = $2 AND organization_id = $3 AND branch_id = $4`,
+    [nextDiag, input.workOrderId, actor.organizationId, actor.branchId],
+  );
+
+  await addWorkOrderNote(client, actor, {
+    workOrderId: input.workOrderId,
+    content: `Arıza Bul (${dtcCode} — ${titleTr}): Önerilen kontrol adımları: ${checklistText}`,
+  });
+
+  return { faultRecordId, diagnosis: nextDiag };
+}
+
+export async function adjustInventoryStock(
+  client: OperationalSqlClient,
+  actor: OperationalActor,
+  input: {
+    inventoryItemId: string;
+    mode: "entry" | "count";
+    quantity: number;
+    unitCost?: number;
+    unitPrice?: number;
+    note?: string;
+  },
+) {
+  if (!isUuid(input.inventoryItemId)) {
+    throw new AccessError("VALIDATION", 400, "Geçerli bir stok kalemi seçin.");
+  }
+  const quantity = Math.round(Number(input.quantity));
+  if (!Number.isInteger(quantity)) {
+    throw new AccessError("VALIDATION", 400, "Geçerli bir stok miktarı girin.");
+  }
+
+  const current = await client.query<{
+    id: string;
+    stock_qty: number;
+    reserved_qty: number;
+    unit_cost: string;
+    unit_price: string;
+  }>(
+    `SELECT id, stock_qty, reserved_qty, unit_cost::text, unit_price::text
+     FROM sanayipro.inventory_items
+     WHERE id = $1 AND organization_id = $2 AND branch_id = $3`,
+    [input.inventoryItemId, actor.organizationId, actor.branchId],
+  );
+  if (!current.rows[0]) {
+    throw new AccessError("NOT_FOUND", 404, "Stok kartı bu şubede bulunamadı.");
+  }
+
+  const cur = current.rows[0];
+  let nextQty = cur.stock_qty;
+  let delta = 0;
+  if (input.mode === "entry") {
+    if (quantity <= 0) {
+      throw new AccessError("VALIDATION", 400, "Stok giriş miktarı pozitif olmalıdır.");
+    }
+    delta = quantity;
+    nextQty = cur.stock_qty + quantity;
+  } else {
+    if (quantity < cur.reserved_qty) {
+      throw new AccessError(
+        "CONFLICT",
+        409,
+        "Fiziksel stok ayrılan miktardan az olamaz.",
+      );
+    }
+    delta = quantity - cur.stock_qty;
+    nextQty = quantity;
+  }
+
+  const nextCost =
+    input.unitCost !== undefined && Number(input.unitCost) >= 0
+      ? Math.round(Number(input.unitCost) * 100) / 100
+      : Number(cur.unit_cost);
+  const nextPrice =
+    input.unitPrice !== undefined && Number(input.unitPrice) >= 0
+      ? Math.round(Number(input.unitPrice) * 100) / 100
+      : Number(cur.unit_price);
+
+  const { rows } = await client.query<{
+    id: string;
+    stock_qty: number;
+    unit_cost: string;
+    unit_price: string;
+  }>(
+    `UPDATE sanayipro.inventory_items
+     SET stock_qty = $1,
+         unit_cost = $2,
+         unit_price = $3,
+         version = version + 1,
+         updated_at = now()
+     WHERE id = $4 AND organization_id = $5 AND branch_id = $6
+     RETURNING id, stock_qty, unit_cost::text, unit_price::text`,
+    [
+      nextQty,
+      nextCost,
+      nextPrice,
+      input.inventoryItemId,
+      actor.organizationId,
+      actor.branchId,
+    ],
+  );
+
+  await client.query(
+    `INSERT INTO sanayipro.inventory_movements
+       (id, organization_id, branch_id, inventory_item_id, actor_user_id, movement_type, quantity_delta, balance_after, unit_cost, note)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+    [
+      randomUUID(),
+      actor.organizationId,
+      actor.branchId,
+      input.inventoryItemId,
+      actor.userId,
+      input.mode === "entry" ? "STOCK_IN" : "COUNT_ADJUST",
+      delta,
+      nextQty,
+      nextCost,
+      cleanText(
+        input.note ||
+          (input.mode === "entry" ? "Tedarik stok girişi" : "Sayım düzeltmesi"),
+        250,
+      ),
+    ],
+  );
+
+  return {
+    id: rows[0].id,
+    stockQty: rows[0].stock_qty,
+    delta,
+    unitCost: Number(rows[0].unit_cost),
+    unitPrice: Number(rows[0].unit_price),
+  };
+}
+
+export async function upsertSupplier(
+  client: OperationalSqlClient,
+  actor: OperationalActor,
+  input: {
+    id?: string;
+    name: string;
+    contactName?: string;
+    phone?: string;
+    email?: string;
+  },
+) {
+  const name = cleanText(input.name, 140);
+  if (name.length < 2) {
+    throw new AccessError("VALIDATION", 400, "Tedarikçi firma adını girin.");
+  }
+  const supplierId = input.id && isUuid(input.id) ? input.id : randomUUID();
+  const { rows } = await client.query<{
+    id: string;
+    name: string;
+    contact_name: string | null;
+    phone: string | null;
+    email: string | null;
+  }>(
+    `INSERT INTO sanayipro.suppliers
+       (id, organization_id, name, contact_name, phone, email, active)
+     VALUES ($1, $2, $3, $4, $5, $6, true)
+     ON CONFLICT (id) DO UPDATE
+       SET name = EXCLUDED.name,
+           contact_name = EXCLUDED.contact_name,
+           phone = EXCLUDED.phone,
+           email = EXCLUDED.email,
+           updated_at = now()
+       WHERE sanayipro.suppliers.organization_id = EXCLUDED.organization_id
+     RETURNING id, name, contact_name, phone, email`,
+    [
+      supplierId,
+      actor.organizationId,
+      name,
+      input.contactName ? cleanText(input.contactName, 120) : null,
+      input.phone ? cleanText(input.phone, 40) : null,
+      input.email ? cleanText(input.email, 140) : null,
+    ],
+  );
+  if (!rows[0]) {
+    throw new AccessError("FORBIDDEN", 403, "Tedarikçi kaydedilemedi.");
+  }
+  return rows[0];
+}
+
+export async function recordExpenseOrRefund(
+  client: OperationalSqlClient,
+  actor: OperationalActor,
+  input: {
+    id?: string;
+    workOrderId?: string | null;
+    kind: "expense" | "refund";
+    title: string;
+    amount: number;
+    category?: string;
+    note?: string;
+  },
+) {
+  const title = cleanText(input.title, 200);
+  const amount = Math.round(Number(input.amount) * 100) / 100;
+  if (title.length < 2 || !Number.isFinite(amount) || amount <= 0) {
+    throw new AccessError("VALIDATION", 400, "Geçerli açıklama ve tutar girin.");
+  }
+  const workOrderId =
+    input.workOrderId && isUuid(input.workOrderId) ? input.workOrderId : null;
+
+  if (input.kind === "refund") {
+    if (!workOrderId) {
+      throw new AccessError("VALIDATION", 400, "İade için geçerli bir iş emri seçin.");
+    }
+    const orderUpdate = await client.query<{ id: string; paid_amount: string }>(
+      `UPDATE sanayipro.work_orders
+       SET paid_amount = paid_amount - $1,
+           version = version + 1,
+           updated_at = now()
+       WHERE id = $2
+         AND organization_id = $3
+         AND branch_id = $4
+         AND paid_amount >= $1
+       RETURNING id, paid_amount::text`,
+      [amount, workOrderId, actor.organizationId, actor.branchId],
+    );
+    if (!orderUpdate.rows[0]) {
+      throw new AccessError(
+        "CONFLICT",
+        409,
+        "İade tutarı tahsil edilen tutarı aşamaz.",
+      );
+    }
+    await client.query(
+      `INSERT INTO sanayipro.work_order_timelines
+         (id, organization_id, branch_id, work_order_id, actor_user_id, actor_name, event_type, description)
+       VALUES ($1, $2, $3, $4, $5, $6, 'REFUND', $7)`,
+      [
+        randomUUID(),
+        actor.organizationId,
+        actor.branchId,
+        workOrderId,
+        actor.userId,
+        actor.actorName || "Kasa",
+        `₺${amount.toFixed(2)} ödeme iadesi kaydedildi: ${title}`,
+      ],
+    );
+  }
+
+  const expenseId = input.id && isUuid(input.id) ? input.id : randomUUID();
+  const { rows } = await client.query<{
+    id: string;
+    kind: string;
+    title: string;
+    amount: string;
+    incurred_at: string;
+  }>(
+    `INSERT INTO sanayipro.expenses
+       (id, organization_id, branch_id, work_order_id, recorded_by_user_id, kind, title, amount, note)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+     RETURNING id, kind, title, amount::text, incurred_at::text`,
+    [
+      expenseId,
+      actor.organizationId,
+      actor.branchId,
+      workOrderId,
+      actor.userId,
+      input.kind === "refund" ? "refund" : "expense",
+      title,
+      amount,
+      input.note ? cleanText(input.note, 400) : null,
+    ],
+  );
+  if (!rows[0]) {
+    throw new AccessError("FORBIDDEN", 403, "Finans işlemi kaydedilemedi.");
+  }
+  return rows[0];
+}
+
+export async function updateStaffMember(
+  client: OperationalSqlClient,
+  actor: OperationalActor,
+  input: {
+    staffId: string;
+    fullName: string;
+    roleTitle?: string;
+    specialty?: string;
+    phone?: string;
+    email?: string;
+    active?: boolean;
+  },
+) {
+  if (!isUuid(input.staffId)) {
+    throw new AccessError("VALIDATION", 400, "Geçerli bir personel seçin.");
+  }
+  const fullName = cleanText(input.fullName, 120);
+  if (fullName.length < 2) {
+    throw new AccessError("VALIDATION", 400, "Personel adı en az 2 karakter olmalıdır.");
+  }
+  const { rows } = await client.query<{
+    id: string;
+    full_name: string;
+    role_title: string;
+    specialty: string | null;
+    active: boolean;
+  }>(
+    `UPDATE sanayipro.staff_members
+     SET full_name = $1,
+         role_title = COALESCE($2, role_title),
+         specialty = COALESCE($3, specialty),
+         phone = COALESCE($4, phone),
+         email = COALESCE($5, email),
+         active = COALESCE($6, active),
+         updated_at = now()
+     WHERE id = $7 AND organization_id = $8 AND branch_id = $9
+     RETURNING id, full_name, role_title, specialty, active`,
+    [
+      fullName,
+      input.roleTitle ? cleanText(input.roleTitle, 80) : null,
+      input.specialty ? cleanText(input.specialty, 120) : null,
+      input.phone ? cleanText(input.phone, 40) : null,
+      input.email ? cleanText(input.email, 120) : null,
+      input.active !== undefined ? Boolean(input.active) : null,
+      input.staffId,
+      actor.organizationId,
+      actor.branchId,
+    ],
+  );
+  if (!rows[0]) {
+    throw new AccessError("NOT_FOUND", 404, "Personel bulunamadı veya güncelleme yetkiniz yok.");
+  }
+  return rows[0];
+}
+

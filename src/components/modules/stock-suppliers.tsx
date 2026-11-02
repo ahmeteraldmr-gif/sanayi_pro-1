@@ -12,6 +12,11 @@ import {
 } from "@/lib/demo-data";
 import { useOperations, type StockPart } from "./operations-store";
 import {
+  persistAdjustInventoryStockAction,
+  persistCreateInventoryItemAction,
+  persistUpsertSupplierAction,
+} from "@/app/app/actions";
+import {
   EntryForm,
   Filter,
   Missing,
@@ -104,6 +109,16 @@ export function StockEntry({
             ...s.movements,
           ],
         }));
+        if (!demo.isDemo) {
+          void persistAdjustInventoryStockAction({
+            inventoryItemId: part.id,
+            mode: correction ? "count" : "entry",
+            quantity: n,
+            note: v.note || (correction ? "Sayım düzeltmesi" : "Stok girişi"),
+          }).then((res) => {
+            if (!res.ok) demo.announce(res.error);
+          });
+        }
         demo.announce("Stok güncellendi.");
       }}
     />
@@ -341,6 +356,19 @@ export function StockPage({
                       ...s.movements,
                     ],
                   }));
+                  if (!demo.isDemo) {
+                    void persistCreateInventoryItemAction({
+                      supplierId: newPart.supplierId || null,
+                      sku: newPart.code,
+                      name: newPart.name,
+                      stockQty: newPart.physical,
+                      minStockQty: newPart.minimum,
+                      unitPrice: newPart.price,
+                      unitCost: newPart.cost,
+                    }).then((res) => {
+                      if (!res.ok) demo.announce(res.error);
+                    });
+                  }
                   demo.announce("Parça kaydedildi.");
                 }}
               />
@@ -889,6 +917,17 @@ export function SuppliersPage({ id }: { id?: string }) {
                   ? s.suppliers.map((x) => (x.id === id ? entry : x))
                   : [...s.suppliers, entry],
               }));
+              if (!demo.isDemo) {
+                void persistUpsertSupplierAction({
+                  id: entry.id,
+                  name: entry.name,
+                  contactName: entry.contact,
+                  phone: entry.phone,
+                  email: entry.email,
+                }).then((res) => {
+                  if (!res.ok) demo.announce(res.error);
+                });
+              }
               demo.announce("Tedarikçi kaydedildi.");
             }}
           />

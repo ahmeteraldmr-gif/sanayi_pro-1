@@ -13,6 +13,10 @@ import {
 } from "lucide-react";
 import { useDemo } from "@/components/app-shell/demo-provider";
 import { useOperations } from "./operations-store";
+import {
+  persistCreateStaffAction,
+  persistUpdateStaffAction,
+} from "@/app/app/actions";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import {
@@ -71,12 +75,13 @@ export function TeamPage({ id }: { id?: string }) {
       fields={fields}
       onSave={(v) => {
         if (v.name.trim().length < 2) return "Çalışan adını kontrol edin.";
+        const staffId = crypto.randomUUID();
         update((s) => ({
           ...s,
           employees: [
             ...s.employees,
             {
-              id: crypto.randomUUID(),
+              id: staffId,
               name: v.name.trim(),
               role: v.role,
               specialty: v.specialty,
@@ -87,6 +92,18 @@ export function TeamPage({ id }: { id?: string }) {
             },
           ],
         }));
+        if (!demo.isDemo) {
+          void persistCreateStaffAction({
+            id: staffId,
+            fullName: v.name.trim(),
+            roleTitle: v.role,
+            specialty: v.specialty,
+            phone: v.phone,
+            email: v.email,
+          }).then((res) => {
+            if (!res.ok) demo.announce(res.error);
+          });
+        }
         demo.announce("Çalışan kaydedildi.");
       }}
     />
@@ -204,6 +221,19 @@ export function TeamPage({ id }: { id?: string }) {
                       : e,
                   ),
                 }));
+                if (!demo.isDemo && id) {
+                  void persistUpdateStaffAction({
+                    staffId: id,
+                    fullName: v.name.trim(),
+                    roleTitle: v.role,
+                    specialty: v.specialty,
+                    phone: v.phone,
+                    email: v.email,
+                    active: v.active === "Aktif",
+                  }).then((res) => {
+                    if (!res.ok) demo.announce(res.error);
+                  });
+                }
                 demo.announce("Çalışan güncellendi.");
               }}
             />

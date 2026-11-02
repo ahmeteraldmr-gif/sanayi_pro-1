@@ -7,6 +7,10 @@ import { useOperations } from "@/components/modules/operations-store";
 import { EntryForm } from "@/components/modules/module-ui";
 import { readPhoto } from "@/lib/photo-file";
 import { money, nowTimeLabel, type WorkOrder } from "@/lib/demo-data";
+import {
+  persistUseInventoryPartAction,
+  persistWorkOrderLaborAction,
+} from "@/app/app/actions";
 
 export function LaborEntry({ order }: { order: WorkOrder }) {
   const demo = useDemo();
@@ -46,6 +50,16 @@ export function LaborEntry({ order }: { order: WorkOrder }) {
             },
           ],
         });
+        if (!demo.isDemo) {
+          void persistWorkOrderLaborAction({
+            workOrderId: order.id,
+            name: v.name.trim(),
+            hours: 1,
+            hourlyRate: amount,
+          }).then((res) => {
+            if (!res.ok) demo.announce(res.error);
+          });
+        }
         demo.announce("İşçilik eklendi. Teklif revizyonu güncellendi.");
       }}
     />
@@ -162,6 +176,16 @@ export function PartEntry({
             },
           ],
         });
+        if (!demo.isDemo && consumed) {
+          void persistUseInventoryPartAction({
+            workOrderId: order.id,
+            inventoryItemId: part.id,
+            quantity,
+            note: `${quantity} adet kullanıldı`,
+          }).then((res) => {
+            if (!res.ok) demo.announce(res.error);
+          });
+        }
         demo.announce(consumed ? "Parça kullanıldı." : "Parça ayrıldı.");
       }}
     />
@@ -227,6 +251,16 @@ export function ConsumePart({
             },
           ],
         });
+        if (!demo.isDemo) {
+          void persistUseInventoryPartAction({
+            workOrderId: order.id,
+            inventoryItemId: partId,
+            quantity: line.quantity,
+            note: "Ayrılan parça kullanıldı",
+          }).then((res) => {
+            if (!res.ok) demo.announce(res.error);
+          });
+        }
         demo.announce("Parça kullanıldı.");
       }}
     >

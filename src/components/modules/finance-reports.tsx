@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useMemo } from "react";
 import { useDemo } from "@/components/app-shell/demo-provider";
 import { useOperations } from "./operations-store";
+import { persistRecordExpenseOrRefundAction } from "@/app/app/actions";
 import { isActive, money, statuses } from "@/lib/demo-data";
 import { QuickActions } from "@/components/app-shell/quick-actions";
 import { Button } from "@/components/ui/button";
@@ -131,21 +132,34 @@ export function FinancePage() {
           demo.updateOrder(order.id, {
             paid: Math.round((order.paid - amount) * 100) / 100,
           });
+        const expenseId = crypto.randomUUID();
+        const kind = tab === "İadeler" ? "refund" : "expense";
         update((s) => ({
           ...s,
           expenses: [
             {
-              id: crypto.randomUUID(),
+              id: expenseId,
               title: v.title,
               amount,
               at: new Date().toISOString(),
               branchId: demo.branchId,
-              kind: tab === "İadeler" ? "refund" : "expense",
+              kind,
               orderId: order?.id,
             },
             ...s.expenses,
           ],
         }));
+        if (!demo.isDemo) {
+          void persistRecordExpenseOrRefundAction({
+            id: expenseId,
+            workOrderId: order?.id || null,
+            kind,
+            title: v.title,
+            amount,
+          }).then((res) => {
+            if (!res.ok) demo.announce(res.error);
+          });
+        }
         demo.announce(
           tab === "İadeler" ? "İade kaydedildi." : "Gider kaydedildi.",
         );
