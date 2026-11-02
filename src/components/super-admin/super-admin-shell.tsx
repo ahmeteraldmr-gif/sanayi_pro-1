@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -14,6 +14,8 @@ import {
   Plus,
   RefreshCw,
   ExternalLink,
+  Menu,
+  X,
 } from "lucide-react";
 import { Brand } from "@/components/marketing/brand";
 import { Button } from "@/components/ui/button";
@@ -47,6 +49,21 @@ export function SuperAdminShell({ children }: SuperAdminShellProps) {
   const [newBizOpen, setNewBizOpen] = useState(false);
   const [extendOpen, setExtendOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  useEffect(() => {
+    if (!mobileNavOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMobileNavOpen(false);
+    };
+    const onPopState = () => setMobileNavOpen(false);
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("popstate", onPopState);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("popstate", onPopState);
+    };
+  }, [mobileNavOpen]);
 
   const activeAlertsCount = alerts.filter(
     (a) => a.severity === "danger" || a.severity === "warning",
@@ -54,12 +71,32 @@ export function SuperAdminShell({ children }: SuperAdminShellProps) {
 
   return (
     <div className="sa-shell">
+      {mobileNavOpen && (
+        <div
+          className="sa-mobile-backdrop"
+          onClick={() => setMobileNavOpen(false)}
+          aria-hidden="true"
+        />
+      )}
       {/* SÜPER ADMIN SIDEBAR */}
-      <aside className="sa-sidebar" aria-label="Süper Admin Menüsü">
+      <aside
+        className={`sa-sidebar ${mobileNavOpen ? "is-mobile-open" : ""}`}
+        aria-label="Süper Admin Menüsü"
+      >
         <div className="sa-sidebar-header">
-          <Link href="/super-admin" className="flex items-center">
-            <Brand />
-          </Link>
+          <div className="flex items-center justify-between gap-2">
+            <Link href="/super-admin" className="flex items-center" onClick={() => setMobileNavOpen(false)}>
+              <Brand />
+            </Link>
+            <button
+              type="button"
+              className="sa-mobile-close-btn"
+              onClick={() => setMobileNavOpen(false)}
+              aria-label="Menüyü kapat"
+            >
+              <X size={20} />
+            </button>
+          </div>
           <div className="sa-brand-badge">
             <span className="sa-brand-badge-dot" aria-hidden="true" />
             <span>SÜPER ADMIN PANELİ</span>
@@ -78,6 +115,7 @@ export function SuperAdminShell({ children }: SuperAdminShellProps) {
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={() => setMobileNavOpen(false)}
                 className={`sa-nav-item ${isActive ? "is-active" : ""}`}
               >
                 <div className="sa-nav-left">
@@ -119,7 +157,17 @@ export function SuperAdminShell({ children }: SuperAdminShellProps) {
       <div className="sa-main">
         <header className="sa-topbar">
           <div className="sa-topbar-left">
-            <h1>SanayiPro Platform Yönetim Masası</h1>
+            <div className="sa-topbar-title-row">
+              <button
+                type="button"
+                className="sa-mobile-menu-btn"
+                onClick={() => setMobileNavOpen(true)}
+                aria-label="Süper Admin menüsünü aç"
+              >
+                <Menu size={20} />
+              </button>
+              <h1>SanayiPro Platform Yönetim Masası</h1>
+            </div>
             <p>Oto servis müşterilerinizi, abonelik paketlerini ve tahsilatları tek ekranda yönetin.</p>
           </div>
 

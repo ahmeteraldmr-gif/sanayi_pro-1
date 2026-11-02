@@ -456,12 +456,21 @@ export function ApplicationShell({
       }
     };
 
+    const handlePopState = () => {
+      setMenuOpen(false);
+      setNotifOpen(false);
+      setUserMenuOpen(false);
+      setCraftModalOpen(false);
+    };
+
     document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("focus", warmUpRoutesOnReturn);
+    window.addEventListener("popstate", handlePopState);
 
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("focus", warmUpRoutesOnReturn);
+      window.removeEventListener("popstate", handlePopState);
     };
   }, [router]);
 

@@ -693,25 +693,233 @@
   margin-bottom: 24px;
 }
 
+.sa-topbar-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sa-mobile-menu-btn,
+.sa-mobile-close-btn {
+  display: none;
+}
+
+.sa-mobile-backdrop {
+  display: none;
+}
+
 /* Responsive */
-@media (max-width: 900px) {
+@media (max-width: 1100px) {
+  .sa-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .sa-packages-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .sa-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .sa-shell {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+
+  .sa-mobile-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+    z-index: 45;
+  }
+
   .sa-sidebar {
-    width: 72px;
+    width: 280px;
+    max-width: calc(100vw - 36px);
+    transform: translateX(-105%);
+    transition: transform 0.22s ease;
+    z-index: 50;
   }
-  .sa-sidebar-header .sa-brand-badge,
-  .sa-sidebar-header span:not(.sa-brand-symbol),
-  .sa-nav-item span,
-  .sa-admin-info,
-  .sa-brand-text {
-    display: none;
+
+  .sa-sidebar.is-mobile-open {
+    transform: translateX(0);
   }
+
+  .sa-mobile-menu-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    border-radius: 9px;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    color: #0f172a;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+
+  .sa-mobile-close-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: rgba(255, 255, 255, 0.08);
+    color: #f8fafc;
+    cursor: pointer;
+  }
+
   .sa-main {
-    margin-left: 72px;
+    margin-left: 0;
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
   }
+
   .sa-topbar {
-    padding: 0 16px;
+    position: sticky;
+    top: 0;
+    height: auto;
+    min-height: 62px;
+    padding: 12px 14px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
   }
+
+  .sa-topbar-left h1 {
+    font-size: 16.5px;
+    line-height: 1.25;
+  }
+
+  .sa-topbar-left p {
+    font-size: 12px;
+    margin-top: 2px;
+  }
+
+  .sa-topbar-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    width: 100%;
+  }
+
+  .sa-topbar-actions > * {
+    width: 100%;
+    min-height: 40px;
+    justify-content: center;
+    margin-left: 0 !important;
+    padding-left: 8px !important;
+    border-left: 0 !important;
+    font-size: 12px !important;
+  }
+
   .sa-content {
-    padding: 16px;
+    padding: 16px 12px 32px;
+    max-width: 100vw;
+    overflow-x: hidden;
   }
+
+  .sa-stats-grid,
+  .sa-packages-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .sa-panel-header {
+    padding: 14px 14px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .sa-search-bar {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 12px 14px;
+    gap: 10px;
+  }
+
+  .sa-search-input-wrap {
+    max-width: 100%;
+  }
+
+  .sa-search-input {
+    height: 44px;
+    font-size: 16px;
+  }
+
+  .sa-filter-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+    max-width: 100%;
+  }
+
+  .sa-filter-tab {
+    white-space: nowrap;
+    min-height: 38px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .sa-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sa-modal {
+    max-width: calc(100vw - 20px);
+    max-height: 92dvh;
+  }
+
+  .sa-modal-header,
+  .sa-modal-body,
+  .sa-modal-footer {
+    padding: 14px 16px;
+  }
+
+  .sa-modal-footer {
+    flex-direction: column-reverse;
+  }
+
+  .sa-modal-footer > * {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  .sa-alert-item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 14px;
+  }
+
+  .sa-detail-hero {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 16px 14px;
+  }
+
+  .sa-info-list-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+}
+
+.sa-table button,
+.sa-table a.button,
+.sa-panel button {
+  min-height: 36px;
+}
+
+.sa-plan-card {
+  padding: 20px 16px;
+  max-width: 100%;
+  box-sizing: border-box;
 }

@@ -93,6 +93,23 @@ export function LoginForm({ configured: _configured = true }: LoginFormProps) {
   // Standard account credentials
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetMessage, setResetMessage] = useState("");
+  const [resetError, setResetError] = useState("");
+
+  const handlePasswordReset = () => {
+    const cleaned = resetEmail.trim().toLowerCase();
+    if (!cleaned || !cleaned.includes("@")) {
+      setResetError("Lütfen kayıtlı e-posta adresinizi doğru biçimde girin.");
+      setResetMessage("");
+      return;
+    }
+    setResetError("");
+    setResetMessage(
+      `${cleaned} adresine şifre sıfırlama bağlantısı gönderildi. E-posta kutunuzu kontrol edin.`,
+    );
+  };
 
   const filteredBranches = useMemo(() => {
     return CRAFTSMAN_BRANCHES.filter((b) => {
@@ -301,6 +318,7 @@ export function LoginForm({ configured: _configured = true }: LoginFormProps) {
             id="login-email"
             name="email"
             type="email"
+            inputMode="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="ornek@sanayipro.com"
@@ -317,9 +335,23 @@ export function LoginForm({ configured: _configured = true }: LoginFormProps) {
 
       {/* Şifre Alanı */}
       <div className="login-field">
-        <label htmlFor="login-password" className="login-label">
-          Şifre
-        </label>
+        <div className="login-label-row">
+          <label htmlFor="login-password" className="login-label">
+            Şifre
+          </label>
+          <button
+            type="button"
+            className="login-forgot-btn"
+            onClick={() => {
+              setResetEmail(email);
+              setResetError("");
+              setResetMessage("");
+              setResetOpen((prev) => !prev);
+            }}
+          >
+            Şifremi Unuttum
+          </button>
+        </div>
         <div className="login-input-wrap">
           <Lock className="login-input-icon" size={18} aria-hidden="true" />
           <input
@@ -369,6 +401,58 @@ export function LoginForm({ configured: _configured = true }: LoginFormProps) {
           Doğrudan Panele Geç →
         </Link>
       </div>
+
+      {/* Şifre Sıfırlama Paneli */}
+      {resetOpen && (
+        <div className="login-reset-panel" role="region" aria-label="Şifre Sıfırlama">
+          <div className="login-reset-head">
+            <strong>Şifre Sıfırlama</strong>
+            <button
+              type="button"
+              className="login-reset-close"
+              onClick={() => setResetOpen(false)}
+              aria-label="Şifre sıfırlamayı kapat"
+            >
+              Kapat
+            </button>
+          </div>
+          <p className="login-reset-desc">
+            Kayıtlı e-posta adresinizi girin, şifre sıfırlama bağlantısını hemen gönderelim.
+          </p>
+          <div className="login-input-wrap">
+            <Mail className="login-input-icon" size={18} aria-hidden="true" />
+            <input
+              type="email"
+              inputMode="email"
+              value={resetEmail}
+              onChange={(e) => {
+                setResetEmail(e.target.value);
+                if (resetError) setResetError("");
+              }}
+              placeholder="ornek@sanayipro.com"
+              className="login-input"
+              aria-label="Şifre sıfırlama e-posta adresi"
+            />
+          </div>
+          {resetError && (
+            <p className="login-reset-error" role="alert">
+              {resetError}
+            </p>
+          )}
+          {resetMessage && (
+            <p className="login-reset-success" role="status">
+              {resetMessage}
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={handlePasswordReset}
+            className="login-reset-submit-btn"
+          >
+            Sıfırlama Bağlantısı Gönder
+          </button>
+        </div>
+      )}
 
       {/* Hata Bildirimi */}
       {state?.error && (

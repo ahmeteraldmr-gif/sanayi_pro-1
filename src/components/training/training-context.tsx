@@ -72,8 +72,11 @@ export function TrainingProvider({ children }: { children: ReactNode }) {
     return progress[activeTrackId]?.currentStepIndex ?? 0;
   }, [activeTrackId, progress]);
 
-  // Auto-show welcome dialog if user is on /app and hasn't dismissed yet
+  // Auto-show welcome dialog if user is on /app (desktop) and hasn't dismissed yet
   useEffect(() => {
+    if (typeof window !== "undefined" && window.innerWidth <= 768) {
+      return;
+    }
     if (!welcomeDismissed && pathname === "/app" && !activeTrackId) {
       const timer = setTimeout(() => {
         setWelcomeOpen(true);

@@ -524,10 +524,14 @@
 }
 
 .login-branch-category-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
   white-space: nowrap;
   font-size: 11px;
   font-weight: 600;
-  padding: 4px 9px;
+  padding: 5px 10px;
   border-radius: 6px;
   background: #f1f5f9;
   color: #475569;
@@ -1289,5 +1293,131 @@
     margin-top: 12px;
     padding-top: 24px;
     border-top: 1px solid #e2e8f0;
+  }
+}
+
+.login-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.login-forgot-btn {
+  background: none;
+  border: 0;
+  padding: 4px 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #2563eb;
+  cursor: pointer;
+  border-radius: 6px;
+  min-height: 36px;
+}
+
+.login-forgot-btn:hover {
+  text-decoration: underline;
+  color: #1d4ed8;
+}
+
+.login-reset-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+}
+
+.login-reset-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.login-reset-head strong {
+  font-size: 14px;
+  color: #0f172a;
+}
+
+.login-reset-close {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  min-height: 34px;
+}
+
+.login-reset-desc {
+  font-size: 12.5px;
+  color: #475569;
+  margin: 0;
+  line-height: 1.45;
+}
+
+.login-reset-error {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #dc2626;
+}
+
+.login-reset-success {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #15803d;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  padding: 8px 10px;
+  border-radius: 8px;
+}
+
+.login-reset-submit-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 10px 14px;
+  border-radius: 9px;
+  border: 0;
+  background: #1e40af;
+  color: #ffffff;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.login-creds-pill {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-toggle-password {
+  min-width: 36px;
+  min-height: 36px;
+}
+
+@media (max-width: 360px) {
+  .login-form-panel {
+    padding: 14px 10px 28px 10px;
+  }
+  .login-card {
+    padding: 16px 12px;
+  }
+  .login-branch-demo-card {
+    padding: 12px 10px;
+  }
+  .login-aux-row {
+    flex-wrap: wrap;
+    gap: 8px;
   }
 }

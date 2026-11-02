@@ -543,6 +543,15 @@ body.tour-mobile-open {
     box-shadow: 0 -8px 30px rgba(15, 23, 42, 0.25);
   }
 
+  .tour-guide-card.top-position {
+    top: 58px;
+    bottom: auto;
+    border-radius: 0 0 16px 16px;
+    border-top: none;
+    border-bottom: 1px solid #cbd5e1;
+    box-shadow: 0 8px 30px rgba(15, 23, 42, 0.25);
+  }
+
   .tour-feedback-toast {
     width: calc(100% - 32px);
     border-radius: 12px;

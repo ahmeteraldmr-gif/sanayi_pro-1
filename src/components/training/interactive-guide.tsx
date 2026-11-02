@@ -187,10 +187,12 @@ export function InteractiveGuide() {
       setTargetRect(rect);
       setStatus("READY");
 
-      // Check if target is in bottom-right quadrant to adjust guide card position
-      const isNearBottomRight =
-        rect.bottom > (window.innerHeight || 800) - 340 &&
-        rect.right > (window.innerWidth || 1200) - 420;
+      // Check if target is in bottom-right quadrant (desktop) or lower half (mobile) to adjust guide card position
+      const isMobile = window.innerWidth <= 640;
+      const isNearBottomRight = isMobile
+        ? rect.bottom > (window.innerHeight || 800) - 260
+        : rect.bottom > (window.innerHeight || 800) - 340 &&
+          rect.right > (window.innerWidth || 1200) - 420;
       setIsTopPosition(isNearBottomRight);
 
       // Highlight attribute
@@ -203,7 +205,6 @@ export function InteractiveGuide() {
       }
 
       // Scroll into view comfortably only if target is outside visible viewport
-      const isMobile = window.innerWidth <= 640;
       if (isMobile) {
         const targetTop = rect.top + window.scrollY;
         if (rect.top < 60 || rect.bottom > (window.innerHeight || 800) - 100) {

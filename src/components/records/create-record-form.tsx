@@ -289,6 +289,7 @@ export function CreateRecordForm({
               <input
                 name="email"
                 type="email"
+                inputMode="email"
                 autoComplete="off"
                 maxLength={120}
                 placeholder="ornek@eposta.com"
@@ -323,6 +324,9 @@ export function CreateRecordForm({
             Plaka
             <input
               name="plate"
+              type="text"
+              inputMode="text"
+              autoCapitalize="characters"
               value={plate}
               onChange={handlePlateChange}
               onBlur={handlePlateBlur}
@@ -370,6 +374,7 @@ export function CreateRecordForm({
             <input
               name="year"
               type="number"
+              inputMode="numeric"
               min={1950}
               max={2027}
               placeholder="2021"
@@ -391,6 +396,7 @@ export function CreateRecordForm({
             <input
               name="mileage"
               type="number"
+              inputMode="numeric"
               min={0}
               max={2000000}
               placeholder="85200"

@@ -537,27 +537,22 @@ export function CalendarPage() {
         return;
       }
 
-      // Mobilde normal tıklama ile sürüklemeyi ayırmak için uzun basma desteği
+      // Normal kısa dokunma/tıklama ile sürüklemeyi ayırmak için basılı tutma eşiği
       const clientX = e.clientX;
       const clientY = e.clientY;
-      if (e.pointerType === "touch") {
-        longPressTimerRef.current = setTimeout(() => {
-          // Destekleyen mobil tarayıcılarda hafif dokunsal titreşim (Haptic Feedback)
-          if (typeof window !== "undefined" && "vibrate" in navigator) {
-            try {
-              navigator.vibrate(35);
-            } catch {}
-          }
-          setActiveDragId(apptId);
-          setDragType("move");
-          setDragPointerPos({ x: clientX, y: clientY });
-        }, 220);
-      } else {
-        // Masaüstünde doğrudan fare basılı tutulduğunda
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+      }
+      longPressTimerRef.current = setTimeout(() => {
+        if (typeof window !== "undefined" && "vibrate" in navigator) {
+          try {
+            navigator.vibrate(35);
+          } catch {}
+        }
         setActiveDragId(apptId);
         setDragType("move");
         setDragPointerPos({ x: clientX, y: clientY });
-      }
+      }, 180);
     },
     [branchAppointments, showDragToast],
   );

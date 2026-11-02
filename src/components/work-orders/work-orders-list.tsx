@@ -318,6 +318,7 @@ export function WorkOrdersList({
                         <p className="app-kanban-customer">
                           {customerFor(order).name}
                         </p>
+                        <p className="app-kanban-complaint">{order.complaint}</p>
                         <div className="app-kanban-person">
                           <span className="app-avatar small">
                             {technicianFor(order.technicianId).initials}
@@ -483,6 +484,7 @@ function OrdersTable({ orders }: { orders: readonly WorkOrder[] }) {
             <p>
               {vehicleFor(order).model} · {customerFor(order).name}
             </p>
+            <p className="app-mobile-order-complaint">{order.complaint}</p>
             <div className="app-mobile-order-bottom">
               <span>{technicianFor(order.technicianId).name}</span>
               <span className={isOverdue(order) ? "is-overdue" : ""}>

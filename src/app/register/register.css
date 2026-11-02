@@ -138,7 +138,9 @@
   background: transparent;
   border: none;
   cursor: pointer;
-  padding: 5px;
+  padding: 6px;
+  min-width: 36px;
+  min-height: 36px;
   border-radius: 5px;
   color: #64748b;
   display: flex;
@@ -280,6 +282,13 @@
 }
 
 /* Responsiveness */
+@media (max-width: 860px) {
+  .register-page-container {
+    display: flex;
+    flex-direction: column;
+  }
+}
+
 @media (max-width: 768px) {
   .register-grid-2 {
     grid-template-columns: 1fr;
@@ -288,5 +297,11 @@
 
   .register-card {
     padding: 24px 18px;
+  }
+}
+
+@media (max-width: 360px) {
+  .register-card {
+    padding: 16px 12px;
   }
 }

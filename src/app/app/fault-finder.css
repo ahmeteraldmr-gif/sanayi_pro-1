@@ -1179,3 +1179,10 @@
     font-size: 0.75rem;
   }
 }
+
+.fault-chip {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
