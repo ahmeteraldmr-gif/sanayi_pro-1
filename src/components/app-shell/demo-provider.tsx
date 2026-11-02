@@ -56,6 +56,18 @@ import {
   type CraftsmanBranchId,
 } from "@/lib/branch-profiles";
 import { startDemoTrialAction } from "@/app/auth/actions";
+import {
+  persistAppointmentAction,
+  persistAssignTechnicianAction,
+  persistCustomerAndVehicleAction,
+  persistFaultSearchAction,
+  persistMoveAppointmentAction,
+  persistPaymentAction,
+  persistWorkOrderAction,
+  persistWorkOrderNoteAction,
+  persistWorkOrderStatusAction,
+} from "@/app/app/actions";
+import type { ServerWorkspaceSnapshot } from "@/server/operations-dal";
 
 // Isolated notice store so toast announcements never re-render the entire /app tree.
 let currentNotice = "";
@@ -257,6 +269,8 @@ export function useRecentPaths() {
 export function DemoProvider({
   children,
   activeTenantInfo,
+  initialServerData,
+  serverBackendReady = false,
 }: {
   children: ReactNode;
   activeTenantInfo?: {
@@ -269,6 +283,8 @@ export function DemoProvider({
     branchSlug?: string;
     isDemo?: boolean;
   } | null;
+  initialServerData?: ServerWorkspaceSnapshot | null;
+  serverBackendReady?: boolean;
 }) {
   const scope = useMemo(
     () => getStorageScope(activeTenantInfo),
@@ -280,11 +296,14 @@ export function DemoProvider({
       key={`ops-${scope.scopeId}`}
       branchSlug={activeTenantInfo?.branchSlug}
       operationsKey={scope.operationsKey}
+      initialServerOperations={initialServerData?.operations ?? null}
     >
       <DemoState
         key={`state-${scope.scopeId}`}
         activeTenantInfo={activeTenantInfo}
         scope={scope}
+        initialServerData={initialServerData}
+        serverBackendReady={serverBackendReady}
       >
         {children}
       </DemoState>
@@ -296,6 +315,8 @@ function DemoState({
   children,
   activeTenantInfo,
   scope,
+  initialServerData,
+  serverBackendReady = false,
 }: {
   children: ReactNode;
   activeTenantInfo?: {
@@ -309,7 +330,10 @@ function DemoState({
     isDemo?: boolean;
   } | null;
   scope: StorageScope;
+  initialServerData?: ServerWorkspaceSnapshot | null;
+  serverBackendReady?: boolean;
 }) {
+  const isDemoMode = activeTenantInfo?.isDemo !== false;
   const branchSlug = activeTenantInfo?.branchSlug || "motor-mekanik";
   const activeBranchProfile = useMemo(
     () => getBranchProfile(branchSlug),
@@ -355,15 +379,21 @@ function DemoState({
   );
   const [customers, setCustomers] = useLocalRepository<readonly Customer[]>(
     scope.customerKey,
-    branchInitialData.customers,
+    !isDemoMode && initialServerData
+      ? initialServerData.customers
+      : branchInitialData.customers,
   );
   const [vehicles, setVehicles] = useLocalRepository<readonly Vehicle[]>(
     scope.vehicleKey,
-    branchInitialData.vehicles,
+    !isDemoMode && initialServerData
+      ? initialServerData.vehicles
+      : branchInitialData.vehicles,
   );
   const [orders, setOrders] = useLocalRepository<readonly WorkOrder[]>(
     scope.orderKey,
-    branchInitialData.orders,
+    !isDemoMode && initialServerData
+      ? initialServerData.orders
+      : branchInitialData.orders,
   );
   const [branchId, setBranchId] = useLocalRepository<BranchId>(
     scope.branchKey,
@@ -375,6 +405,9 @@ function DemoState({
   );
 
   const initialAppointments = useMemo<DemoContextValue["demoAppointments"]>(() => {
+    if (!isDemoMode && initialServerData) {
+      return initialServerData.appointments;
+    }
     const firstVehId = branchInitialData.vehicles[0]?.id || initialVehicles[0].id;
     return [
       {
@@ -385,18 +418,24 @@ function DemoState({
         branchId: "dortyol",
       },
     ];
-  }, [activeBranchProfile, branchInitialData.vehicles]);
+  }, [isDemoMode, initialServerData, activeBranchProfile, branchInitialData.vehicles]);
 
   const [demoAppointments, setAppointments] = useLocalRepository<
     DemoContextValue["demoAppointments"]
   >(scope.appointmentKey, initialAppointments);
   const [payments, setPayments] = useLocalRepository<
     DemoContextValue["payments"]
-  >(scope.paymentKey, EMPTY_PAYMENTS);
+  >(
+    scope.paymentKey,
+    !isDemoMode && initialServerData ? initialServerData.payments : EMPTY_PAYMENTS,
+  );
 
   const [faultHistory, setFaultHistory] = useLocalRepository<
     DemoContextValue["faultHistory"]
-  >(scope.faultHistoryKey, []);
+  >(
+    scope.faultHistoryKey,
+    !isDemoMode && initialServerData ? initialServerData.faultHistory : [],
+  );
 
   const announce = useCallback((message: string) => {
     emitNotice(message);
@@ -760,8 +799,15 @@ function DemoState({
 
   const assignTechnician = useCallback(
     (orderId: string, technicianId: string) => {
+      if (!isDemoMode && !serverBackendReady) {
+        announce(
+          "Sunucu veritabanı bağlantısı yapılandırılmamış. İşletme verisi kaydedilemedi.",
+        );
+        return false;
+      }
       const tech = technicianMapRef.current.get(technicianId);
       if (!tech) return false;
+      const prevOrders = ordersRef.current;
       setOrders((current) =>
         current.map((order) => {
           if (order.id !== orderId) return order;
@@ -785,15 +831,37 @@ function DemoState({
           };
         }),
       );
+      if (!isDemoMode && serverBackendReady) {
+        void persistAssignTechnicianAction({
+          workOrderId: orderId,
+          staffMemberId: technicianId,
+        }).then((res) => {
+          if (!res.ok) {
+            setOrders(prevOrders);
+            announce(res.error);
+          } else {
+            announce(`Sorumlu usta güncellendi: ${tech.name}.`);
+          }
+        });
+        return true;
+      }
       announce(`Sorumlu usta güncellendi: ${tech.name}.`);
       return true;
     },
-    [setOrders, announce],
+    [isDemoMode, serverBackendReady, setOrders, announce],
   );
 
   const collectPayment = useCallback(
     (id: string, amount: number) => {
+      if (!isDemoMode && !serverBackendReady) {
+        announce(
+          "Sunucu veritabanı bağlantısı yapılandırılmamış. Tahsilat kaydedilemedi.",
+        );
+        return false;
+      }
       let success = false;
+      const prevOrders = ordersRef.current;
+      const prevPayments = payments;
       setOrders((current) => {
         const order = current.find((item) => item.id === id);
         if (
@@ -832,16 +900,35 @@ function DemoState({
             at: new Date().toISOString(),
           },
         ]);
+        if (!isDemoMode && serverBackendReady) {
+          void persistPaymentAction({ workOrderId: id, amount }).then((res) => {
+            if (!res.ok) {
+              setOrders(prevOrders);
+              setPayments(prevPayments);
+              announce(res.error);
+            } else {
+              announce("Tahsilat veritabanına kaydedildi.");
+            }
+          });
+          return true;
+        }
         announce("Tahsilat kaydedildi.");
         return true;
       }
       return false;
     },
-    [setOrders, setPayments, announce],
+    [isDemoMode, serverBackendReady, payments, setOrders, setPayments, announce],
   );
 
   const updateAppointment = useCallback(
     (id: string, values: Record<string, unknown>) => {
+      if (!isDemoMode && !serverBackendReady) {
+        announce(
+          "Sunucu veritabanı bağlantısı yapılandırılmamış. Randevu taşınamadı.",
+        );
+        return;
+      }
+      const prev = appointmentsRef.current;
       setAppointments((current) =>
         current.map((a) => {
           if (a.id !== id) return a;
@@ -849,9 +936,31 @@ function DemoState({
           return updated;
         }),
       );
+      if (!isDemoMode && serverBackendReady && typeof values.at === "string") {
+        void persistMoveAppointmentAction({
+          appointmentId: id,
+          startsAt: values.at,
+          durationMinutes:
+            typeof values.durationMinutes === "number"
+              ? values.durationMinutes
+              : undefined,
+          staffMemberId:
+            typeof values.technicianId === "string" ? values.technicianId : undefined,
+          status: typeof values.status === "string" ? values.status : undefined,
+          serviceNote: typeof values.note === "string" ? values.note : undefined,
+        }).then((res) => {
+          if (!res.ok) {
+            setAppointments(prev);
+            announce(res.error);
+          } else {
+            announce("Randevu güncellendi.");
+          }
+        });
+        return;
+      }
       announce("Randevu güncellendi.");
     },
-    [setAppointments, announce],
+    [isDemoMode, serverBackendReady, setAppointments, announce],
   );
 
   const deleteAppointment = useCallback(
@@ -871,6 +980,12 @@ function DemoState({
       status?: string,
       durationMinutes?: number,
     ) => {
+      if (!isDemoMode && !serverBackendReady) {
+        announce(
+          "Sunucu veritabanı bağlantısı yapılandırılmamış. Randevu kaydedilemedi.",
+        );
+        return false;
+      }
       if (
         !vehicleMapRef.current.has(vehicleId) ||
         !Number.isFinite(Date.parse(at))
@@ -885,10 +1000,12 @@ function DemoState({
       const duration = durationMinutes && durationMinutes >= 15 ? durationMinutes : 60;
       const startDate = new Date(at);
       const endDate = new Date(startDate.getTime() + duration * 60000);
+      const prev = appointmentsRef.current;
+      const tempId = crypto.randomUUID();
       setAppointments((current) => [
         ...current,
         {
-          id: crypto.randomUUID(),
+          id: tempId,
           vehicleId,
           at,
           durationMinutes: duration,
@@ -900,10 +1017,30 @@ function DemoState({
           status: status || "Planlandı",
         },
       ]);
+      if (!isDemoMode && serverBackendReady) {
+        const veh = vehicleMapRef.current.get(vehicleId);
+        void persistAppointmentAction({
+          vehicleId,
+          customerId: veh?.customerId,
+          staffMemberId: technicianId || null,
+          startsAt: startDate.toISOString(),
+          durationMinutes: duration,
+          serviceNote: note.trim(),
+          status: status || "Planlandı",
+        }).then((res) => {
+          if (!res.ok) {
+            setAppointments(prev);
+            announce(res.error);
+          } else {
+            announce("Randevu kaydedildi.");
+          }
+        });
+        return true;
+      }
       announce("Randevu kaydedildi.");
       return true;
     },
-    [setAppointments, branchId, announce],
+    [isDemoMode, serverBackendReady, setAppointments, branchId, announce],
   );
 
   const saveFaultQuery = useCallback(
@@ -929,10 +1066,19 @@ function DemoState({
         },
         ...current.slice(0, 49), // Son 50 sorguyu tut
       ]);
+      if (!isDemoMode && serverBackendReady) {
+        void persistFaultSearchAction({
+          dtcCode: item.code,
+          vehicleId: item.vehicleId,
+          vehiclePlate: item.vehiclePlate,
+          vehicleModel: item.vehicleModel,
+          technicianNotes: item.technicianNotes,
+        });
+      }
       announce("Arıza kodu sorgusu geçmişe kaydedildi.");
       return id;
     },
-    [setFaultHistory, announce],
+    [isDemoMode, serverBackendReady, setFaultHistory, announce],
   );
 
   const attachFaultToWorkOrder = useCallback(
@@ -1111,20 +1257,59 @@ function DemoState({
         lastService: null,
       };
 
+      if (!isDemoMode && !serverBackendReady) {
+        const msg =
+          "Sunucu veritabanı bağlantısı yapılandırılmamış. Gerçek işletme verileri tarayıcıya kaydedilmez.";
+        announce(msg);
+        return { field: "general", error: msg };
+      }
+
       // 6. Atomik Kayıt (Tutarlı ve eksiksiz kayıt)
+      const prevCustomers = customersRef.current;
+      const prevVehicles = vehiclesRef.current;
       if (createdNewCustomer) {
         setCustomers((current) => [...current, createdNewCustomer!]);
       }
       setVehicles((current) => [...current, vehicle]);
 
+      if (!isDemoMode && serverBackendReady) {
+        void persistCustomerAndVehicleAction({
+          customerId: input.customerId || undefined,
+          fullName: customer.name,
+          phone: customer.phone,
+          email: customer.email,
+          plate: vehicle.plate,
+          brand: brandTrim || "Belirtilmedi",
+          model: combinedModel,
+          year: vehicle.year,
+          kilometer: vehicle.mileage ?? 0,
+          fuelType: vehicle.fuelType ?? null,
+        }).then((res) => {
+          if (!res.ok) {
+            setCustomers(prevCustomers);
+            setVehicles(prevVehicles);
+            announce(res.error);
+          } else {
+            announce("Müşteri ve araç veritabanına kaydedildi.");
+          }
+        });
+        return { vehicle, customer };
+      }
+
       announce("Müşteri ve araç başarıyla kaydedildi.");
       return { vehicle, customer };
     },
-    [setCustomers, setVehicles, announce],
+    [isDemoMode, serverBackendReady, setCustomers, setVehicles, announce],
   );
 
   const acceptVehicle = useCallback(
     (input: IntakeInput) => {
+      if (!isDemoMode && !serverBackendReady) {
+        const msg =
+          "Sunucu veritabanı bağlantısı yapılandırılmamış. İş emri oluşturulamadı.";
+        announce(msg);
+        return { error: msg };
+      }
       const vehicle = vehicleMapRef.current.get(input.vehicleId);
       if (!vehicle) return { error: "Önce bir araç seçin." };
       if (
@@ -1217,15 +1402,44 @@ function DemoState({
           },
         ],
       };
+      const prevOrders = ordersRef.current;
       setOrders((current) => [order, ...current]);
+      if (!isDemoMode && serverBackendReady) {
+        void persistWorkOrderAction({
+          customerId: vehicle.customerId,
+          vehicleId: vehicle.id,
+          primaryTechnicianId: input.technicianId,
+          complaint: input.complaint.trim(),
+          diagnosis: "Tespit bekleniyor.",
+          intakeKilometer: input.mileage,
+          fuelLevel: input.fuel,
+          intakeChecklistJson: input.checklist,
+          dueAt: input.dueAt,
+        }).then((res) => {
+          if (!res.ok) {
+            setOrders(prevOrders);
+            announce(res.error);
+          } else {
+            announce(`${vehicle.plate} için iş emri veritabanına kaydedildi.`);
+          }
+        });
+        return { orderId: id };
+      }
       announce(`${vehicle.plate} için ${id} oluşturuldu.`);
       return { orderId: id };
     },
-    [technicians, branchId, setOrders, announce],
+    [isDemoMode, serverBackendReady, technicians, branchId, setOrders, announce],
   );
 
   const changeStatus = useCallback(
     (id: string, status: WorkOrderStatus) => {
+      if (!isDemoMode && !serverBackendReady) {
+        announce(
+          "Sunucu veritabanı bağlantısı yapılandırılmamış. İş emri durumu güncellenemedi.",
+        );
+        return;
+      }
+      const prevOrders = ordersRef.current;
       const currentOrder = ordersRef.current.find((order) => order.id === id);
       if (
         status === "DELIVERED" &&
@@ -1299,9 +1513,24 @@ function DemoState({
           };
         }),
       );
+      if (!isDemoMode && serverBackendReady) {
+        void persistWorkOrderStatusAction({
+          workOrderId: id,
+          status,
+          description: statusTimelineText[status],
+        }).then((res) => {
+          if (!res.ok) {
+            setOrders(prevOrders);
+            announce(res.error);
+          } else {
+            announce(`Durum güncellendi: ${statuses[status].label}.`);
+          }
+        });
+        return;
+      }
       announce(`Durum güncellendi: ${statuses[status].label}.`);
     },
-    [setVehicles, setOrders, announce],
+    [isDemoMode, serverBackendReady, setVehicles, setOrders, announce],
   );
 
   const quickTechnicianAction = useCallback(
@@ -1369,9 +1598,16 @@ function DemoState({
 
   const addNote = useCallback(
     (id: string, text: string, author = "Ahmet") => {
+      if (!isDemoMode && !serverBackendReady) {
+        announce(
+          "Sunucu veritabanı bağlantısı yapılandırılmamış. Not kaydedilemedi.",
+        );
+        return;
+      }
       const trimmed = text.trim();
       if (!trimmed || trimmed.length > 2000) return;
       const cleanAuthor = author.trim() || "Ahmet";
+      const prevOrders = ordersRef.current;
       setOrders((current) =>
         current.map((order) =>
           order.id === id
@@ -1400,9 +1636,24 @@ function DemoState({
             : order,
         ),
       );
+      if (!isDemoMode && serverBackendReady) {
+        void persistWorkOrderNoteAction({
+          workOrderId: id,
+          content: trimmed,
+          authorName: cleanAuthor,
+        }).then((res) => {
+          if (!res.ok) {
+            setOrders(prevOrders);
+            announce(res.error);
+          } else {
+            announce("Personel iç notu veritabanına kaydedildi.");
+          }
+        });
+        return;
+      }
       announce("Personel iç notu kaydedildi.");
     },
-    [setOrders, announce],
+    [isDemoMode, serverBackendReady, setOrders, announce],
   );
 
   const recordApproval = useCallback(

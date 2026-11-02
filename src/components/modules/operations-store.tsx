@@ -219,12 +219,15 @@ export function OperationsProvider({
   children,
   branchSlug,
   operationsKey,
+  initialServerOperations,
 }: {
   children: ReactNode;
   branchSlug?: string;
   operationsKey?: string;
+  initialServerOperations?: Operations | null;
 }) {
   const initialData = useMemo(() => {
+    if (initialServerOperations) return initialServerOperations;
     if (!branchSlug) return initial;
     const profile = getBranchProfile(branchSlug);
     const bData = getBranchInitialData(branchSlug);
@@ -283,7 +286,7 @@ export function OperationsProvider({
         tradeId: profile.id,
       },
     };
-  }, [branchSlug]);
+  }, [branchSlug, initialServerOperations]);
 
   const storageKey =
     operationsKey || (branchSlug ? `demo:${branchSlug}:operations` : "operations");

@@ -94,6 +94,10 @@ function ensureStorageListener() {
   });
 }
 
+function isBrowserDemoPersistenceAllowed(key: string): boolean {
+  return key.startsWith("demo:") || key === "recent";
+}
+
 function scheduleFlush() {
   if (flushScheduled || typeof window === "undefined") return;
   flushScheduled = true;
@@ -101,6 +105,7 @@ function scheduleFlush() {
     flushScheduled = false;
     for (const [k, val] of pendingWrites.entries()) {
       pendingWrites.delete(k);
+      if (!isBrowserDemoPersistenceAllowed(k)) continue;
       try {
         window.localStorage.setItem(prefix + k, JSON.stringify(val));
       } catch {
@@ -137,6 +142,11 @@ export function useLocalRepository<T>(
 
   const read = useCallback((): T => {
     if (cache.has(key)) return cache.get(key) as T;
+    // Real tenant sessions (org:*) never read or fall back to browser localStorage.
+    if (!isBrowserDemoPersistenceAllowed(key)) {
+      cache.set(key, initial);
+      return initial;
+    }
     try {
       let raw = window.localStorage.getItem(prefix + key);
       // Migration fallback: if demo:* not found, check legacy branch:* format
@@ -174,8 +184,10 @@ export function useLocalRepository<T>(
       if (Object.is(next, current)) return;
       cache.set(key, next);
       emitKey(key);
-      pendingWrites.set(key, next);
-      scheduleFlush();
+      if (isBrowserDemoPersistenceAllowed(key)) {
+        pendingWrites.set(key, next);
+        scheduleFlush();
+      }
     },
     [key, read],
   );

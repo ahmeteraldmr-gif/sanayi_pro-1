@@ -36,11 +36,24 @@ async function resolveTenant(
     include: { organization: true },
   });
   if (!branch) throw new AccessError("FORBIDDEN", 403);
+  const roleRows = await tx.$queryRaw<{ code: string; name: string }[]>`
+    SELECT r.code, r.name
+    FROM sanayipro.branch_memberships bm
+    JOIN sanayipro.roles r ON r.id = bm.role_id AND r.organization_id = bm.organization_id
+    WHERE bm.branch_id = ${selection.branchId}::uuid
+      AND bm.organization_id = ${selection.organizationId}::uuid
+      AND bm.user_id = auth.uid()
+      AND bm.active = true
+    LIMIT 1
+  `;
+  const activeRole = roleRows[0] ?? { code: "member", name: "Atölye Personeli" };
   return Object.freeze({
     ...selection,
     userId,
     organizationName: branch.organization.name,
     branchName: branch.name,
+    roleCode: activeRole.code,
+    roleName: activeRole.name,
     permissions: Object.freeze(granted),
   });
 }
@@ -54,6 +67,19 @@ export function authorizeVerifiedIdentity<T>(
   return withVerifiedIdentity(userId, async (tx) =>
     work(tx, await resolveTenant(tx, userId, selection, required)),
   );
+}
+export function verifyPlatformAdmin(userId: string) {
+  return withVerifiedIdentity(userId, async (tx) => {
+    if (!isUuid(userId)) throw new AccessError("FORBIDDEN", 403);
+    const rows = await tx.$queryRaw<{ user_id: string; email: string }[]>`
+      SELECT user_id, email
+      FROM sanayipro.platform_admins
+      WHERE user_id = auth.uid() AND active = true
+      LIMIT 1
+    `;
+    if (!rows[0]) throw new AccessError("FORBIDDEN", 403);
+    return rows[0];
+  });
 }
 export async function tenantChoicesForVerifiedIdentity(userId: string) {
   return withVerifiedIdentity(userId, async (tx) => {

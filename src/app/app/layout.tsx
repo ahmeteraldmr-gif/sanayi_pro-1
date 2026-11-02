@@ -9,6 +9,10 @@ import "./calendar.css";
 import "./fault-finder.css";
 import { getVerifiedUser } from "@/server/auth";
 import { readLocalSession } from "@/server/local-auth";
+import {
+  loadTenantWorkspaceSnapshot,
+  type ServerWorkspaceSnapshot,
+} from "@/server/operations-dal";
 import { getTenantContext } from "@/server/tenant";
 import { AccessError, backendConfigured } from "@/server/security";
 
@@ -34,8 +38,10 @@ export default async function AppLayout({
     branchSlug?: string;
     isDemo?: boolean;
   } | null = null;
+  let initialServerData: ServerWorkspaceSnapshot | null = null;
+  const serverBackendReady = backendConfigured();
 
-  if (backendConfigured()) {
+  if (serverBackendReady) {
     try {
       const tenant = await getTenantContext();
       const meta = (await getVerifiedUser()).user_metadata as
@@ -48,10 +54,11 @@ export default async function AppLayout({
         branchName: tenant.branchName,
         displayName:
           typeof meta?.display_name === "string" ? meta.display_name : undefined,
-        role: "İşletme Sahibi",
+        role: tenant.roleName || "İşletme Sahibi",
         branchSlug: "motor-mekanik",
         isDemo: false,
       };
+      initialServerData = await loadTenantWorkspaceSnapshot();
     } catch (error) {
       if (
         error instanceof AccessError &&
@@ -71,7 +78,11 @@ export default async function AppLayout({
   }
 
   return (
-    <DemoProvider activeTenantInfo={activeTenantInfo}>
+    <DemoProvider
+      activeTenantInfo={activeTenantInfo}
+      initialServerData={initialServerData}
+      serverBackendReady={serverBackendReady}
+    >
       <ApplicationShell activeTenantInfo={activeTenantInfo}>
         {children}
       </ApplicationShell>

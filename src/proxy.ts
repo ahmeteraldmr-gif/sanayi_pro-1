@@ -1,6 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { authorizeVerifiedIdentity } from "@/server/authorization";
+import {
+  authorizeVerifiedIdentity,
+  verifyPlatformAdmin,
+} from "@/server/authorization";
+import { verifySignedCookiePayload } from "@/server/local-auth";
 import {
   AccessError,
   backendConfigured,
@@ -46,19 +50,20 @@ export async function proxy(request: NextRequest) {
       );
 
     // Cookie fallback is development-only; production never trusts it.
+    // Even in local dev, cookies must pass HMAC-SHA256 verification.
     const sessionCookie = request.cookies.get("sanayipro-session")?.value;
-    const hasSession =
-      localAuthEnabled() && !!sessionCookie;
+    const verifiedSession = verifySignedCookiePayload<Record<string, unknown>>(
+      sessionCookie,
+    );
+    const hasSession = localAuthEnabled() && !!verifiedSession;
 
-    let userRole = "";
-    let isDemoSession = false;
-    if (sessionCookie) {
-      try {
-        const parsed = JSON.parse(sessionCookie);
-        userRole = parsed?.role || "";
-        isDemoSession = Boolean(parsed?.isDemoSession || parsed?.email?.startsWith("demo.") || parsed?.email === "demo.egitim@sanayipro.com");
-      } catch {}
-    }
+    const userRole = String(verifiedSession?.role || "");
+    const email = String(verifiedSession?.email || "");
+    const isDemoSession = Boolean(
+      verifiedSession?.isDemoSession ||
+        email.startsWith("demo.") ||
+        email === "demo.egitim@sanayipro.com",
+    );
 
     // Server-side route protection: Super Admin panel
     if (isSuperAdmin) {
@@ -91,11 +96,6 @@ export async function proxy(request: NextRequest) {
     return finish(response);
   }
 
-  // The platform (Super Admin) panel has no server-side role model or data source
-  // yet. With a real backend it must never be reachable, authenticated or not.
-  if (isSuperAdmin)
-    return finish(NextResponse.redirect(new URL("/app", request.url)));
-
   try {
     const { url, key } = getPublicAuthConfig();
     const client = createServerClient(url, key, {
@@ -125,6 +125,18 @@ export async function proxy(request: NextRequest) {
     });
 
     const { data, error } = await client.auth.getUser();
+
+    if (isSuperAdmin) {
+      if (error || !data.user || data.user.is_anonymous) {
+        return finish(NextResponse.redirect(new URL("/login", request.url)));
+      }
+      try {
+        await verifyPlatformAdmin(data.user.id);
+      } catch {
+        return finish(NextResponse.redirect(new URL("/app", request.url)));
+      }
+      return finish(response);
+    }
 
     if (isApp || isApi) {
       if (error || !data.user || data.user.is_anonymous)

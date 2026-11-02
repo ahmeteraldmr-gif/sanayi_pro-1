@@ -5,16 +5,43 @@ export class AccessError extends Error {
       | "UNAUTHENTICATED"
       | "TENANT_REQUIRED"
       | "FORBIDDEN"
+      | "RATE_LIMITED"
+      | "VALIDATION"
+      | "CONFLICT"
+      | "NOT_FOUND"
       | "UNAVAILABLE",
     public readonly status: number,
+    message?: string,
   ) {
-    super(code);
+    super(message ?? code);
     this.name = "AccessError";
   }
 }
 export const TENANT_COOKIE = "sanayipro-tenant";
 export const permissionCodes = ["app.access", "tenant.read"] as const;
-export type PermissionCode = (typeof permissionCodes)[number];
+export const operationalPermissionCodes = [
+  "customers.read",
+  "customers.write",
+  "vehicles.read",
+  "vehicles.write",
+  "work_orders.read",
+  "work_orders.write",
+  "work_orders.assign",
+  "appointments.read",
+  "appointments.write",
+  "inventory.read",
+  "inventory.write",
+  "finance.read",
+  "finance.write",
+  "faults.read",
+  "faults.write",
+  "team.read",
+  "team.write",
+  "platform.super_admin",
+] as const;
+export type PermissionCode =
+  | (typeof permissionCodes)[number]
+  | (typeof operationalPermissionCodes)[number];
 export type TenantSelection = Readonly<{
   organizationId: string;
   branchId: string;
@@ -24,6 +51,8 @@ export type TenantContext = TenantSelection &
     userId: string;
     organizationName: string;
     branchName: string;
+    roleCode?: string;
+    roleName?: string;
     permissions: readonly string[];
   }>;
 export const isUuid = (value: unknown): value is string =>
@@ -121,7 +150,10 @@ export const RUNTIME_ROLE_CHECK_SQL = `SELECT current_user::text AS role_name,
  EXISTS(SELECT 1 FROM pg_auth_members m WHERE m.member=r.oid) AS member_of_roles,
  EXISTS(SELECT 1 FROM pg_class c WHERE c.relnamespace='sanayipro'::regnamespace AND c.relowner=r.oid) AS owns_tables,
  has_schema_privilege(current_user,'sanayipro','CREATE') AS create_schema_objects,
- EXISTS(SELECT 1 FROM pg_class c WHERE c.relnamespace='sanayipro'::regnamespace AND c.relkind='r' AND has_table_privilege(current_user,c.oid,'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')) AS can_mutate
+ (
+   EXISTS(SELECT 1 FROM pg_class c WHERE c.relnamespace='sanayipro'::regnamespace AND c.relkind='r' AND has_table_privilege(current_user,c.oid,'TRUNCATE,REFERENCES,TRIGGER'))
+   OR EXISTS(SELECT 1 FROM pg_class c WHERE c.relnamespace='sanayipro'::regnamespace AND c.relkind='r' AND c.relname IN ('organizations','branches','user_profiles','organization_memberships','branch_memberships','roles','permissions','role_permissions','platform_admins') AND has_table_privilege(current_user,c.oid,'INSERT,UPDATE,DELETE'))
+ ) AS can_mutate
  FROM pg_roles r WHERE r.rolname=current_user`;
 export type RuntimeCapabilities = {
   role_name: string;
@@ -199,10 +231,45 @@ export function onboardingConfigured(env: Environment = process.env) {
 }
 // The cookie-based fallback exists for local development only. It is refused in
 // production builds so a missing backend can never turn into an auth bypass.
-// Running a production build WITHOUT Supabase (demo/preview) requires the explicit
-// operator opt-in SANAYIPRO_LOCAL_PREVIEW=1; it is never enabled by default.
+// Whenever a real backend is configured or a production cloud environment is detected,
+// SANAYIPRO_LOCAL_PREVIEW is unconditionally refused.
 export function localAuthEnabled(env: Environment = process.env) {
+  if (
+    backendConfigured(env) ||
+    env.VERCEL_ENV === "production" ||
+    env.SANAYIPRO_PRODUCTION_DEPLOY === "1"
+  ) {
+    return false;
+  }
   return env.NODE_ENV !== "production" || env.SANAYIPRO_LOCAL_PREVIEW === "1";
+}
+
+const rateBuckets = new Map<string, { count: number; resetAt: number }>();
+
+export function checkRateLimit(
+  key: string,
+  limit: number = 30,
+  windowMs: number = 60_000,
+) {
+  const now = Date.now();
+  if (rateBuckets.size > 5_000) {
+    for (const [k, v] of rateBuckets) {
+      if (v.resetAt <= now) rateBuckets.delete(k);
+    }
+  }
+  const current = rateBuckets.get(key);
+  if (!current || current.resetAt <= now) {
+    rateBuckets.set(key, { count: 1, resetAt: now + windowMs });
+    return;
+  }
+  current.count += 1;
+  if (current.count > limit) {
+    throw new AccessError(
+      "RATE_LIMITED",
+      429,
+      "Çok fazla istek gönderildi. Lütfen kısa süre sonra tekrar deneyin.",
+    );
+  }
 }
 
 export const ONBOARDING_ROLE_CHECK_SQL = `SELECT current_user::text AS role_name,
