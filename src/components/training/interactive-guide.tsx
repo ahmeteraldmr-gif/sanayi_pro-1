@@ -95,13 +95,25 @@ export function InteractiveGuide() {
       if (direct) return direct;
 
       // 1b. Fallback aliases for known key targets
+      if (selector.includes("quick-actions")) {
+        const qa = document.querySelector('[data-tour="quick-actions"], .app-quick-actions-trigger, button:has(.lucide-plus)');
+        if (qa) return qa;
+      }
+      if (selector.includes("global-search")) {
+        const gs = document.querySelector('[data-tour="global-search"], .app-global-search-input, input[placeholder*="Plaka"]');
+        if (gs) return gs;
+      }
       if (selector.includes("branch-selector")) {
-        const branchEl = document.querySelector('.app-branch-selector, [data-tour="craft-branch-switcher"]');
-        if (branchEl) return branchEl;
+        const bs = document.querySelector('[data-tour="branch-selector"], .app-branch-selector, [data-tour="craft-branch-switcher"]');
+        if (bs) return bs;
+      }
+      if (selector.includes("notifications")) {
+        const notif = document.querySelector('[data-tour="notifications"], .app-notification-trigger');
+        if (notif) return notif;
       }
       if (selector.includes("sidebar-nav")) {
-        const navEl = document.querySelector('.app-nav, [data-tour="sidebar-nav"]');
-        if (navEl) return navEl;
+        const nav = document.querySelector('[data-tour="sidebar-nav"], .app-nav');
+        if (nav) return nav;
       }
 
       // 2. Also check data-tour-id if selector has data-tour
@@ -174,12 +186,7 @@ export function InteractiveGuide() {
       };
     }
 
-    const startRaf = requestAnimationFrame(() => {
-      if (!unmounted) {
-        setStatus("SEARCHING");
-      }
-    });
-
+    // Do not schedule delayed startRaf that overwrites measureAndHighlight!
     const measureAndHighlight = (el: Element) => {
       if (unmounted) return;
       const rect = el.getBoundingClientRect();
@@ -243,6 +250,8 @@ export function InteractiveGuide() {
     const initialEl = resolveTargetElement(activeStep.targetSelector);
     if (initialEl) {
       measureAndHighlight(initialEl);
+    } else {
+      setStatus("SEARCHING");
     }
 
     // MutationObserver: ONLY observe child additions/removals, NEVER attributes!
@@ -283,7 +292,6 @@ export function InteractiveGuide() {
 
     return () => {
       unmounted = true;
-      cancelAnimationFrame(startRaf);
       observer.disconnect();
       clearInterval(intervalTimer);
       clearTimeout(timeoutTimer);
