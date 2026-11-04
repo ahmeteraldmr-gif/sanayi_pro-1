@@ -27,6 +27,8 @@ import {
   PlateSearchDemo,
 } from "./home-interactions";
 
+const asset = (path: string) => `${process.env.NODE_ENV === "production" ? "/sanayipro" : ""}${path}`;
+
 const processSteps = [
   {
     step: "01",
@@ -156,7 +158,7 @@ export function CorporateHome() {
 
                 <div className="sp-stage-media">
                   <Image
-                    src="/product/work-order.jpg"
+                    src={asset("/product/work-order.jpg")}
                     alt="SanayiPro 2.0 iş emri ve müşteri onayı ekranı"
                     width={1440}
                     height={1000}
@@ -440,7 +442,7 @@ export function CorporateHome() {
                     <span>%98</span>
                   </div>
                   <Image
-                    src="/product/mobile-jobs.jpg"
+                    src={asset("/product/mobile-jobs.jpg")}
                     alt="SanayiPro mobil usta ekranı: Bana atanan işler, durum ilerletme ve fotoğraf"
                     width={390}
                     height={844}
@@ -713,14 +715,14 @@ export function CorporateHome() {
               </p>
 
               <div className="sp-final-actions">
-                <a href="/app" className="sp-btn-primary is-large" target="_blank" rel="noopener">
+                <Link href="/app" className="sp-btn-primary is-large" target="_blank" rel="noopener">
                   <span className="sp-pulse-dot" />
                   <span>Canlı Paneli Hemen Açın</span>
                   <ArrowRight size={17} />
-                </a>
-                <a href="/login" className="sp-btn-outline">
+                </Link>
+                <Link href="/login" className="sp-btn-outline">
                   Kayıtlı Giriş Yap
-                </a>
+                </Link>
               </div>
 
               <div className="sp-final-guarantee">

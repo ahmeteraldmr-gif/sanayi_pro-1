@@ -33,13 +33,13 @@ export function CorporateHeader() {
           ))}
         </nav>
         <div className="sp-header-actions">
-          <a href="/app" className="sp-demo-link" target="_blank" rel="noopener">
+          <Link href="/app" className="sp-demo-link" target="_blank" rel="noopener">
             <span className="sp-pulse-dot" />
             Canlı Paneli Aç
-          </a>
-          <a href="/login" className="sp-login-link">
+          </Link>
+          <Link href="/login" className="sp-login-link">
             Giriş Yap
-          </a>
+          </Link>
           <a href="#iletisim" className="sp-cta-btn">
             Bilgi Al <ArrowRight size={15} />
           </a>
@@ -60,12 +60,12 @@ export function CorporateHeader() {
                 ))}
               </nav>
               <div className="sp-mobile-menu-actions">
-                <a href="/app" className="sp-mobile-demo-btn" onClick={() => setOpen(false)}>
+                <Link href="/app" className="sp-mobile-demo-btn" onClick={() => setOpen(false)}>
                   <span className="sp-pulse-dot" /> Canlı Çalışma Alanını Aç
-                </a>
-                <a href="/login" className="sp-mobile-login-btn" onClick={() => setOpen(false)}>
+                </Link>
+                <Link href="/login" className="sp-mobile-login-btn" onClick={() => setOpen(false)}>
                   Giriş Yap
-                </a>
+                </Link>
                 <a className="sp-cta-btn" href="#iletisim" onClick={() => setOpen(false)}>
                   Bilgi Al & Demo Talep Et <ArrowRight size={16} />
                 </a>
@@ -78,6 +78,8 @@ export function CorporateHeader() {
   );
 }
 
+const asset = (path: string) => `${process.env.NODE_ENV === "production" ? "/sanayipro" : ""}${path}`;
+
 const screens = [
   {
     id: "dashboard",
@@ -85,7 +87,7 @@ const screens = [
     tag: "GÜNÜN FOTOĞRAFI",
     title: "Servisteki bütün araçları ve aşamaları tek bakışta görün.",
     copy: "Servisteki aktif araçlar, müşteri onayını bekleyen teklifler, parçası yolda olan işler ve bugünün randevuları. Güne nereden başlayacağınızı düşünmeyin, öncelikler gözünüzün önünde olsun.",
-    src: "/product/dashboard.jpg",
+    src: asset("/product/dashboard.jpg"),
     alt: "SanayiPro kokpit: servisteki araçlar, durumları ve bugünün randevuları",
     highlights: ["Aktif Araç Sayacı", "Onay Bekleyenler", "Bugünün Randevuları", "Kritik Stok Uyarısı"]
   },
@@ -95,7 +97,7 @@ const screens = [
     tag: "TAM ŞEFFAFLIK",
     title: "Tekliften teslime; işçilik, parça ve müşteri onayı aynı yerde.",
     copy: "Usta arıza tespitini girer, işçilik ve parça listesi oluşturulur. Müşteriden telefon veya WhatsApp üzerinden alınan onay revizyon numarasıyla kaydedilir. Fiyat karmaşasına ve unutulan parçalara son verin.",
-    src: "/product/work-order.jpg",
+    src: asset("/product/work-order.jpg"),
     alt: "SanayiPro iş emri: müşteri onayı, sıradaki işlem ve açık bakiye",
     highlights: ["WhatsApp Onay Kaydı", "Usta Görevlendirmesi", "Rezerve Parça Tüketimi", "Açık Bakiye Hesabı"]
   },
@@ -105,7 +107,7 @@ const screens = [
     tag: "2 DAKİKADA KABUL",
     title: "Hasar fotoğrafları ve kontrol listesiyle kusursuz teslim alma.",
     copy: "Plakayı yazın veya listeden seçin. Giriş kilometresi, yakıt seviyesi, müşteri şikâyeti, 5 açılı hasar fotoğrafları ve kontrol listesi tek formda toplanır. Aracın mevcut çizik ve hasarları daha ilk dakikada güvence altına alınır.",
-    src: "/product/intake.jpg",
+    src: asset("/product/intake.jpg"),
     alt: "SanayiPro beş adımlı araç kabul ekranı",
     highlights: ["5 Açılı Fotoğraf", "Kaporta Hasar Notu", "Kilometre & Yakıt", "Zorunlu Kontrol Listesi"]
   },
@@ -115,7 +117,7 @@ const screens = [
     tag: "SERVİS HAFIZASI",
     title: "Her aracın kendine ait eksiksiz bir servis hafızası olsun.",
     copy: "Müşteri kim, bu araca en son hangi tarihte kaç kilometrede hangi yağ ve filtre konuldu? Araç tekrar geldiğinde hafızanızı zorlamayın; tüm servis geçmişi ve müşteri bakiyesi anında açılsın.",
-    src: "/product/vehicle.jpg",
+    src: asset("/product/vehicle.jpg"),
     alt: "SanayiPro araç detayında plaka, müşteri ve servis geçmişi",
     highlights: ["Tek Tıkla Plaka Geçmişi", "Zaman Çizelgesi", "Toplam Bakiye Takibi", "Doğrudan Kabul Başlatma"]
   },
@@ -125,7 +127,7 @@ const screens = [
     tag: "KRONOLOJİK DÖKÜM",
     title: "Yıllar önceki bir işlemi saniyeler içinde doğrulayın.",
     copy: "Aracın servisinize yaptığı tüm ziyaretler kronolojik olarak listelenir. Değişen parçalar, yapılan kontroller ve kilometre artışı grafiksel zaman çizelgesiyle sunulur.",
-    src: "/product/history.jpg",
+    src: asset("/product/history.jpg"),
     alt: "SanayiPro araç servis geçmişi zaman çizelgesi",
     highlights: ["Tarih & Kilometre Kaydı", "Önceki Parça Numaraları", "İş Emri Bağlantısı", "Güvenilir Arıza Referansı"]
   },
