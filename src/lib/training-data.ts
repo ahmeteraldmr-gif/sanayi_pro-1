@@ -47,7 +47,10 @@ export function isRouteMatching(expectedRoute: string, pathname: string): boolea
   if (e === "/app/stock/[id]") return /^\/app\/stock\/[^/]+/.test(p);
   if (e === "/app/team/[id]") return /^\/app\/team\/[^/]+/.test(p);
 
-  return p === e || p.startsWith(e + "/");
+  if (p === e) return true;
+  if (e === "/app") return false;
+
+  return p.startsWith(e + "/");
 }
 
 export type TrainingTrack = {

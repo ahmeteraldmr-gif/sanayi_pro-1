@@ -403,10 +403,9 @@ export function InteractiveGuide() {
     return () => clearTimeout(timer);
   }, [status, pathname]);
 
-  // 6. Global Document Click Capture Listener (Action steps only)
+  // 6. Global Document Click Capture Listener (Advances on clicking highlighted target)
   useEffect(() => {
     if (!isTrainingActive || !activeStep || status !== "READY") return;
-    if (!isActionStep) return;
 
     const handleDocumentClick = (e: MouseEvent) => {
       const clickTarget = e.target as Element | null;
@@ -507,24 +506,55 @@ export function InteractiveGuide() {
         </div>
       )}
 
-      {/* 2. İnteraktif Spotlight Kutusu (Hedef elemanı çevreler) */}
+      {/* 2. İnteraktif Spotlight Kutusu & Karartma (Hedef elemanı çevreler) */}
       {isTrainingActive && targetRect && status === "READY" && (
-        <div
-          className={`tour-target-spotlight ${!isActionStep ? "info-mode" : ""}`}
-          style={{
-            top: targetRect.top - 6,
-            left: targetRect.left - 6,
-            width: targetRect.width + 12,
-            height: targetRect.height + 12,
-          }}
-          aria-hidden="true"
-        >
-          <span className="tour-spotlight-pulse" />
-          <div className="tour-spotlight-arrow-badge">
-            <span>👇</span>
-            <span>{isActionStep ? "BURAYA TIKLAYIN" : "İNCELEYİN"}</span>
+        <>
+          {/* Ekran Karartma & Hedef Eleman Penceresi (SVG Mask Cutout) */}
+          <svg className="tour-backdrop-svg" aria-hidden="true">
+            <defs>
+              <mask id="tour-spotlight-mask">
+                <rect x="0" y="0" width="100%" height="100%" fill="white" />
+                <rect
+                  x={Math.max(0, targetRect.left - 6)}
+                  y={Math.max(0, targetRect.top - 6)}
+                  width={targetRect.width + 12}
+                  height={targetRect.height + 12}
+                  rx="12"
+                  ry="12"
+                  fill="black"
+                />
+              </mask>
+            </defs>
+            <rect
+              x="0"
+              y="0"
+              width="100%"
+              height="100%"
+              fill="rgba(15, 23, 42, 0.55)"
+              mask="url(#tour-spotlight-mask)"
+            />
+          </svg>
+
+          {/* 3px Neon Parlayan Hareketli Çerçeve */}
+          <div
+            className={`tour-target-spotlight ${!isActionStep ? "info-mode" : ""}`}
+            style={{
+              top: targetRect.top - 6,
+              left: targetRect.left - 6,
+              width: targetRect.width + 12,
+              height: targetRect.height + 12,
+            }}
+            aria-hidden="true"
+          >
+            <span className="tour-spotlight-pulse" />
+            <div
+              className={`tour-spotlight-arrow-badge ${targetRect.top < 65 ? "badge-bottom" : "badge-top"}`}
+            >
+              <span>{targetRect.top < 65 ? "👆" : "👇"}</span>
+              <span>{isActionStep ? "BURAYA TIKLAYIN" : "İNCELEYİN"}</span>
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* 3. Yanlış Sayfa Akıllı Yönlendirme Kartı */}

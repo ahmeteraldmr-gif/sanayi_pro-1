@@ -764,7 +764,7 @@ export function ApplicationShell({
             <GlobalSearch />
           </div>
           <div className="app-topbar-actions">
-            <div data-tour="quick-actions">
+            <div>
               <QuickActions />
             </div>
             {/* 23 Usta Branşı Hızlı Değiştirici */}
@@ -866,11 +866,13 @@ export function ApplicationShell({
               </select>
               <ChevronDown size={14} aria-hidden="true" />
             </label>
-            <div data-tour="notifications">
+            <div>
               <Dialog open={notifOpen} onOpenChange={setNotifOpen}>
                 <DialogTrigger asChild>
                   <button
                     className="app-icon-button app-notification-trigger"
+                    data-tour="notifications"
+                    data-tour-id="notifications"
                     aria-label="Bildirimleri aç"
                   >
                     <Bell size={20} />
