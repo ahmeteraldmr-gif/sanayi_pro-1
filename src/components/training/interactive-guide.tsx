@@ -94,6 +94,16 @@ export function InteractiveGuide() {
       const direct = document.querySelector(selector);
       if (direct) return direct;
 
+      // 1b. Fallback aliases for known key targets
+      if (selector.includes("branch-selector")) {
+        const branchEl = document.querySelector('.app-branch-selector, [data-tour="craft-branch-switcher"]');
+        if (branchEl) return branchEl;
+      }
+      if (selector.includes("sidebar-nav")) {
+        const navEl = document.querySelector('.app-nav, [data-tour="sidebar-nav"]');
+        if (navEl) return navEl;
+      }
+
       // 2. Also check data-tour-id if selector has data-tour
       const tourMatch = selector.match(/data-tour="([^"]+)"/);
       if (tourMatch && tourMatch[1]) {
@@ -582,11 +592,30 @@ export function InteractiveGuide() {
 
           {/* İçerik */}
           <div className="tour-guide-body">
+            {/* Konum Göstergesi */}
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-200/70 mb-2 w-fit">
+              <Compass size={13} className="text-blue-600" />
+              <span>
+                Konum: {activeStep.expectedRoute === "/app" ? "Genel Bakış (Ana Panel)" : activeStep.expectedRoute.replace("/app/", "").toUpperCase()}
+              </span>
+            </div>
+
             <h4 className="tour-step-title">{activeStep.title}</h4>
             <p className="tour-step-instruction">{activeStep.instruction}</p>
             {activeStep.detail && (
               <p className="tour-step-detail">{activeStep.detail}</p>
             )}
+
+            {/* Ne Yapılacak Açık İpucu Kutusu */}
+            <div className="mt-2.5 p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-700 flex items-start gap-2">
+              <span className="text-sm">👉</span>
+              <span className="leading-relaxed">
+                <strong>Ne yapmalısınız?</strong>{" "}
+                {isActionStep
+                  ? "Ekranda mavi ile vurgulanan öğeye tıklayın."
+                  : 'Bilgiyi inceleyin ve aşağıdaki mavi "Sonraki →" butonuna basın.'}
+              </span>
+            </div>
 
             {activeStep.demoHint && (
               <div className="tour-demo-hint">
