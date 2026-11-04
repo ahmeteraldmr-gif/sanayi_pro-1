@@ -37,37 +37,17 @@ export function getStepType(step: TrainingStep): TrainingStepType {
 
 export function isRouteMatching(expectedRoute: string, pathname: string): boolean {
   if (!expectedRoute) return true;
-  const cleanPath = (pathname || "").replace(/^\/sanayipro/, "").replace(/\/+$/, "") || "/";
-  const cleanExpected = (expectedRoute || "").replace(/\/+$/, "") || "/";
+  const p = (pathname || "").replace(/^\/sanayipro/, "").replace(/\/+$/, "") || "/";
+  const e = (expectedRoute || "").replace(/^\/sanayipro/, "").replace(/\/+$/, "") || "/";
 
-  if (cleanExpected === "/app/work-orders/[id]") {
-    return /^\/app\/work-orders\/[^/]+/.test(cleanPath);
-  }
-  if (cleanExpected === "/app/customers/[id]") {
-    return /^\/app\/customers\/[^/]+/.test(cleanPath);
-  }
-  if (cleanExpected === "/app/vehicles/[id]") {
-    return /^\/app\/vehicles\/[^/]+/.test(cleanPath);
-  }
-  if (cleanExpected === "/app/suppliers/[id]") {
-    return /^\/app\/suppliers\/[^/]+/.test(cleanPath);
-  }
-  if (cleanExpected === "/app/stock/[id]") {
-    return /^\/app\/stock\/[^/]+/.test(cleanPath);
-  }
-  if (cleanExpected === "/app/team/[id]") {
-    return /^\/app\/team\/[^/]+/.test(cleanPath);
-  }
-  if (cleanExpected === "/app") {
-    return cleanPath === "/app";
-  }
-  if (cleanExpected === "/app/work-orders") {
-    return cleanPath === "/app/work-orders";
-  }
-  if (cleanExpected === "/app/customers") {
-    return cleanPath === "/app/customers";
-  }
-  return cleanPath.startsWith(cleanExpected);
+  if (e === "/app/work-orders/[id]") return /^\/app\/work-orders\/[^/]+/.test(p);
+  if (e === "/app/customers/[id]") return /^\/app\/customers\/[^/]+/.test(p);
+  if (e === "/app/vehicles/[id]") return /^\/app\/vehicles\/[^/]+/.test(p);
+  if (e === "/app/suppliers/[id]") return /^\/app\/suppliers\/[^/]+/.test(p);
+  if (e === "/app/stock/[id]") return /^\/app\/stock\/[^/]+/.test(p);
+  if (e === "/app/team/[id]") return /^\/app\/team\/[^/]+/.test(p);
+
+  return p === e || p.startsWith(e + "/");
 }
 
 export type TrainingTrack = {
