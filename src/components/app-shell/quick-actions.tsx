@@ -47,6 +47,9 @@ export function QuickActions({
     <>
       <Button
         variant={outline ? "outline" : "default"}
+        data-tour="quick-actions"
+        data-tour-id="quick-action-button"
+        data-tour-target="quick-action-button"
         className={
           mobile
             ? "app-bottom-create"

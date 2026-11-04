@@ -43,10 +43,51 @@
   position: fixed;
   pointer-events: none !important;
   z-index: 9980;
-  border-radius: 10px;
-  border: 2px solid #2563eb;
-  box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.42), 0 0 20px rgba(37, 99, 235, 0.5);
+  border-radius: 12px;
+  border: 3px solid #2563eb;
+  box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.52), 0 0 25px rgba(37, 99, 235, 0.75);
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: tour-spotlight-glow 2s infinite ease-in-out;
+}
+
+@keyframes tour-spotlight-glow {
+  0%, 100% {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.52), 0 0 25px rgba(37, 99, 235, 0.75);
+  }
+  50% {
+    border-color: #8b5cf6;
+    box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.52), 0 0 35px rgba(139, 92, 246, 0.85);
+  }
+}
+
+.tour-spotlight-arrow-badge {
+  position: absolute;
+  top: -34px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: linear-gradient(135deg, #1d4ed8, #7c3aed);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  white-space: nowrap;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.5);
+  animation: tour-arrow-bob 1.2s infinite ease-in-out alternate;
+}
+
+@keyframes tour-arrow-bob {
+  from {
+    transform: translate(-50%, 0);
+  }
+  to {
+    transform: translate(-50%, -5px);
+  }
 }
 
 /* Hedef öğeyi diğer katmanların üstüne çıkar */

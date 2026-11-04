@@ -280,15 +280,17 @@ export function InteractiveGuide() {
       }
     }, 250);
 
-    // Timeout (4.5 seconds): if still not found, transition to TARGET_NOT_FOUND
+    // Timeout (2 seconds): if still not found, transition to TARGET_NOT_FOUND
     const timeoutTimer = setTimeout(() => {
       if (unmounted) return;
       const el = resolveTargetElement(activeStep.targetSelector);
-      if (!el) {
+      if (el) {
+        measureAndHighlight(el);
+      } else {
         setStatus("TARGET_NOT_FOUND");
         setTargetRect(null);
       }
-    }, 4500);
+    }, 2000);
 
     return () => {
       unmounted = true;
@@ -510,17 +512,18 @@ export function InteractiveGuide() {
         <div
           className={`tour-target-spotlight ${!isActionStep ? "info-mode" : ""}`}
           style={{
-            top: targetRect.top - 4,
-            left: targetRect.left - 4,
-            width: targetRect.width + 8,
-            height: targetRect.height + 8,
+            top: targetRect.top - 6,
+            left: targetRect.left - 6,
+            width: targetRect.width + 12,
+            height: targetRect.height + 12,
           }}
           aria-hidden="true"
         >
           <span className="tour-spotlight-pulse" />
-          <span className="tour-spotlight-badge">
-            {isActionStep ? "Buraya Tıklayın" : "İnceleyin"}
-          </span>
+          <div className="tour-spotlight-arrow-badge">
+            <span>👇</span>
+            <span>{isActionStep ? "BURAYA TIKLAYIN" : "İNCELEYİN"}</span>
+          </div>
         </div>
       )}
 
@@ -647,12 +650,23 @@ export function InteractiveGuide() {
             )}
 
             {status === "TARGET_NOT_FOUND" && (
-              <div className="mt-3 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs">
-                <p className="font-semibold">Hedef öğe görüntülenemedi</p>
-                <p className="text-[11px] text-amber-700 mt-0.5">
-                  Öğe bu sayfada henüz yüklenmedi veya farklı bir bölümdedir.
+              <div className="mt-3 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs shadow-sm">
+                <p className="font-bold flex items-center gap-1.5">
+                  <AlertCircle size={14} className="text-amber-600" />
+                  Hedef öğe arandı ancak görüntülenemedi
                 </p>
-                <div className="flex flex-wrap items-center gap-2 mt-2">
+                <p className="text-[11.5px] text-amber-700 mt-1 leading-relaxed">
+                  Öğe bu ekranda farklı bir menüde olabilir. Eğitime kesintisiz devam etmek için adımı atlayabilirsiniz.
+                </p>
+                <div className="flex flex-wrap items-center gap-2 mt-2.5">
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-7 text-xs bg-blue-600 text-white hover:bg-blue-700 font-semibold shadow-sm"
+                    onClick={skipStep}
+                  >
+                    Adımı Atla ve Devam Et <ArrowRight size={13} className="ml-1" />
+                  </Button>
                   <Button
                     type="button"
                     size="sm"
@@ -664,22 +678,6 @@ export function InteractiveGuide() {
                   >
                     <RefreshCw size={12} className="mr-1" /> Yeniden Dene
                   </Button>
-                  {activeStep.expectedRoute && !isRouteMatching(activeStep.expectedRoute, pathname) && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="h-7 text-xs bg-blue-600 text-white hover:bg-blue-700"
-                      onClick={() => {
-                        if (!activeStep.expectedRoute.includes("[id]")) {
-                          router.push(activeStep.expectedRoute);
-                        } else {
-                          router.push("/app/work-orders");
-                        }
-                      }}
-                    >
-                      İlgili Sayfaya Git
-                    </Button>
-                  )}
                   <Button
                     type="button"
                     size="sm"
