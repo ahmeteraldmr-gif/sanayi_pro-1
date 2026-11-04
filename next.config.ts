@@ -21,6 +21,9 @@ const nextConfig: NextConfig = {
   trailingSlash: true,
   poweredByHeader: false,
   devIndicators: false,
+  images: {
+    unoptimized: true,
+  },
   experimental: {
     optimizePackageImports: ["lucide-react"],
   },
