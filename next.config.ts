@@ -14,7 +14,10 @@ const securityHeaders = [
   },
 ];
 
+const basePath = process.env.BASE_PATH !== undefined ? process.env.BASE_PATH : (process.env.NODE_ENV === "production" ? "/sanayipro" : "");
+
 const nextConfig: NextConfig = {
+  basePath,
   poweredByHeader: false,
   devIndicators: false,
   experimental: {
