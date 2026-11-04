@@ -37,34 +37,37 @@ export function getStepType(step: TrainingStep): TrainingStepType {
 
 export function isRouteMatching(expectedRoute: string, pathname: string): boolean {
   if (!expectedRoute) return true;
-  if (expectedRoute === "/app/work-orders/[id]") {
-    return /^\/app\/work-orders\/[^/]+/.test(pathname);
+  const cleanPath = (pathname || "").replace(/^\/sanayipro/, "").replace(/\/+$/, "") || "/";
+  const cleanExpected = (expectedRoute || "").replace(/\/+$/, "") || "/";
+
+  if (cleanExpected === "/app/work-orders/[id]") {
+    return /^\/app\/work-orders\/[^/]+/.test(cleanPath);
   }
-  if (expectedRoute === "/app/customers/[id]") {
-    return /^\/app\/customers\/[^/]+/.test(pathname);
+  if (cleanExpected === "/app/customers/[id]") {
+    return /^\/app\/customers\/[^/]+/.test(cleanPath);
   }
-  if (expectedRoute === "/app/vehicles/[id]") {
-    return /^\/app\/vehicles\/[^/]+/.test(pathname);
+  if (cleanExpected === "/app/vehicles/[id]") {
+    return /^\/app\/vehicles\/[^/]+/.test(cleanPath);
   }
-  if (expectedRoute === "/app/suppliers/[id]") {
-    return /^\/app\/suppliers\/[^/]+/.test(pathname);
+  if (cleanExpected === "/app/suppliers/[id]") {
+    return /^\/app\/suppliers\/[^/]+/.test(cleanPath);
   }
-  if (expectedRoute === "/app/stock/[id]") {
-    return /^\/app\/stock\/[^/]+/.test(pathname);
+  if (cleanExpected === "/app/stock/[id]") {
+    return /^\/app\/stock\/[^/]+/.test(cleanPath);
   }
-  if (expectedRoute === "/app/team/[id]") {
-    return /^\/app\/team\/[^/]+/.test(pathname);
+  if (cleanExpected === "/app/team/[id]") {
+    return /^\/app\/team\/[^/]+/.test(cleanPath);
   }
-  if (expectedRoute === "/app") {
-    return pathname === "/app";
+  if (cleanExpected === "/app") {
+    return cleanPath === "/app";
   }
-  if (expectedRoute === "/app/work-orders") {
-    return pathname === "/app/work-orders";
+  if (cleanExpected === "/app/work-orders") {
+    return cleanPath === "/app/work-orders";
   }
-  if (expectedRoute === "/app/customers") {
-    return pathname === "/app/customers";
+  if (cleanExpected === "/app/customers") {
+    return cleanPath === "/app/customers";
   }
-  return pathname.startsWith(expectedRoute);
+  return cleanPath.startsWith(cleanExpected);
 }
 
 export type TrainingTrack = {

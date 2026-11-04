@@ -107,7 +107,10 @@ export function InteractiveGuide() {
 
   // Check if current route is mismatched with expected route
   // If target element is already present in DOM (e.g. sidebar or topbar), it is NOT a mismatch!
-  const isTargetSidebarNav = activeStep?.targetSelector.includes("nav-") ?? false;
+  const isTargetSidebarNav =
+    (activeStep?.targetSelector.includes("nav-") ||
+      activeStep?.targetSelector.includes("sidebar-nav")) ??
+    false;
   const isTargetGlobal =
     (activeStep?.targetSelector.includes("global-search") ||
       activeStep?.targetSelector.includes("quick-actions") ||
@@ -515,10 +518,16 @@ export function InteractiveGuide() {
           </div>
           <Button
             size="sm"
-            onClick={() => router.push(activeStep.expectedRoute)}
+            onClick={() => {
+              if (isRouteMatching(activeStep.expectedRoute, pathname)) {
+                nextStep();
+              } else {
+                router.push(activeStep.expectedRoute);
+              }
+            }}
             className="tour-redirect-btn"
           >
-            Oraya Git <ArrowRight size={14} />
+            {isRouteMatching(activeStep.expectedRoute, pathname) ? "Adıma Başla" : "Oraya Git"} <ArrowRight size={14} />
           </Button>
           <button
             type="button"
