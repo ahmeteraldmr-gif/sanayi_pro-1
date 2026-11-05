@@ -65,16 +65,22 @@ export async function proxy(request: NextRequest) {
         email === "demo.egitim@sanayipro.com",
     );
 
+    const redirectTarget = (path: string) => {
+      const url = request.nextUrl.clone();
+      url.pathname = path;
+      return url;
+    };
+
     // Server-side route protection: Super Admin panel
     if (isSuperAdmin) {
       if (!hasSession) {
         return finish(
-          NextResponse.redirect(new URL("/login", request.url)),
+          NextResponse.redirect(redirectTarget("/login")),
         );
       }
       if (userRole !== "Süper Admin" || isDemoSession) {
         return finish(
-          NextResponse.redirect(new URL("/app", request.url)),
+          NextResponse.redirect(redirectTarget("/app")),
         );
       }
     }
@@ -83,12 +89,12 @@ export async function proxy(request: NextRequest) {
     if (isApp) {
       if (!hasSession) {
         return finish(
-          NextResponse.redirect(new URL("/login", request.url)),
+          NextResponse.redirect(redirectTarget("/login")),
         );
       }
       if (userRole === "Süper Admin") {
         return finish(
-          NextResponse.redirect(new URL("/super-admin", request.url)),
+          NextResponse.redirect(redirectTarget("/super-admin")),
         );
       }
     }
@@ -128,12 +134,12 @@ export async function proxy(request: NextRequest) {
 
     if (isSuperAdmin) {
       if (error || !data.user || data.user.is_anonymous) {
-        return finish(NextResponse.redirect(new URL("/login", request.url)));
+        return finish(NextResponse.redirect(redirectTarget("/login")));
       }
       try {
         await verifyPlatformAdmin(data.user.id);
       } catch {
-        return finish(NextResponse.redirect(new URL("/app", request.url)));
+        return finish(NextResponse.redirect(redirectTarget("/app")));
       }
       return finish(response);
     }
@@ -166,7 +172,7 @@ export async function proxy(request: NextRequest) {
         : code === "FORBIDDEN" || code === "TENANT_REQUIRED"
           ? "/auth/tenant"
           : "/login?setup=required";
-    return finish(NextResponse.redirect(new URL(target, request.url)));
+    return finish(NextResponse.redirect(redirectTarget(target)));
   }
 }
 

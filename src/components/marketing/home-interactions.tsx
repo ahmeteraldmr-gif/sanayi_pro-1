@@ -33,13 +33,13 @@ export function CorporateHeader() {
           ))}
         </nav>
         <div className="sp-header-actions">
-          <Link href="/app" className="sp-demo-link" target="_blank" rel="noopener">
+          <a href={asset("/app/")} className="sp-demo-link" target="_blank" rel="noopener">
             <span className="sp-pulse-dot" />
             Canlı Paneli Aç
-          </Link>
-          <Link href="/login" className="sp-login-link">
+          </a>
+          <a href={asset("/login/")} className="sp-login-link">
             Giriş Yap
-          </Link>
+          </a>
           <a href="#iletisim" className="sp-cta-btn">
             Bilgi Al <ArrowRight size={15} />
           </a>
@@ -60,12 +60,12 @@ export function CorporateHeader() {
                 ))}
               </nav>
               <div className="sp-mobile-menu-actions">
-                <Link href="/app" className="sp-mobile-demo-btn" onClick={() => setOpen(false)}>
+                <a href={asset("/app/")} className="sp-mobile-demo-btn" target="_blank" rel="noopener" onClick={() => setOpen(false)}>
                   <span className="sp-pulse-dot" /> Canlı Çalışma Alanını Aç
-                </Link>
-                <Link href="/login" className="sp-mobile-login-btn" onClick={() => setOpen(false)}>
+                </a>
+                <a href={asset("/login/")} className="sp-mobile-login-btn" onClick={() => setOpen(false)}>
                   Giriş Yap
-                </Link>
+                </a>
                 <a className="sp-cta-btn" href="#iletisim" onClick={() => setOpen(false)}>
                   Bilgi Al & Demo Talep Et <ArrowRight size={16} />
                 </a>
@@ -243,9 +243,9 @@ export function DemoContactForm() {
             Bilgileriniz kaydedildi. Servis danışmanımız en kısa sürede sizinle iletişime geçerek işletmenize özel akışı gösterecektir.
           </p>
           <div className="sp-success-actions">
-            <Link href="/app" className="sp-button" target="_blank">
+            <a href={asset("/app/")} className="sp-button" target="_blank" rel="noopener">
               Hemen Canlı Paneli İnceleyin <ArrowRight size={16} />
-            </Link>
+            </a>
             <button className="sp-btn-link" onClick={() => setSubmitted(false)}>
               Yeni Form Gönder
             </button>
@@ -450,9 +450,9 @@ export function PlateSearchDemo() {
 
           <div className="sp-dossier-footer">
             <span>Tek bir plaka girdiniz; müşteri, açık iş, usta ve hesap anında önünüze geldi.</span>
-            <Link href="/app" className="sp-view-record-link" target="_blank">
+            <a href={asset("/app/")} className="sp-view-record-link" target="_blank" rel="noopener">
               Canlı Panelde İncele <ArrowRight size={15} />
-            </Link>
+            </a>
           </div>
         </div>
       </div>

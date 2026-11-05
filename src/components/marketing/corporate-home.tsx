@@ -126,10 +126,10 @@ export function CorporateHome() {
                 <span>Hemen Bilgi Alın</span>
                 <ArrowRight size={17} />
               </a>
-              <Link href="/app" className="sp-btn-secondary" target="_blank">
+              <a href={asset("/app/")} className="sp-btn-secondary" target="_blank" rel="noopener">
                 <span className="sp-live-dot" />
                 <span>Canlı Paneli Aç</span>
-              </Link>
+              </a>
             </div>
 
             <div className="sp-hero-trust-row">
@@ -715,14 +715,14 @@ export function CorporateHome() {
               </p>
 
               <div className="sp-final-actions">
-                <Link href="/app" className="sp-btn-primary is-large" target="_blank" rel="noopener">
+                <a href={asset("/app/")} className="sp-btn-primary is-large" target="_blank" rel="noopener">
                   <span className="sp-pulse-dot" />
                   <span>Canlı Paneli Hemen Açın</span>
                   <ArrowRight size={17} />
-                </Link>
-                <Link href="/login" className="sp-btn-outline">
+                </a>
+                <a href={asset("/login/")} className="sp-btn-outline">
                   Kayıtlı Giriş Yap
-                </Link>
+                </a>
               </div>
 
               <div className="sp-final-guarantee">
@@ -780,8 +780,8 @@ export function CorporateHome() {
 
             <div className="sp-footer-links-col">
               <h5>Hızlı Erişim</h5>
-              <Link href="/app" target="_blank">Canlı Panel</Link>
-              <Link href="/login">Kullanıcı Girişi</Link>
+              <a href={asset("/app/")} target="_blank" rel="noopener">Canlı Panel</a>
+              <a href={asset("/login/")}>Kullanıcı Girişi</a>
               <a href="#ana-sayfa">Başa Dön ↑</a>
             </div>
           </div>
