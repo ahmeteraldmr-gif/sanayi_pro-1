@@ -43,6 +43,12 @@ export async function proxy(request: NextRequest) {
     return result;
   };
 
+  const redirectTarget = (path: string) => {
+    const url = request.nextUrl.clone();
+    url.pathname = path;
+    return url;
+  };
+
   if (!backendConfigured()) {
     if (isApi)
       return finish(
@@ -64,12 +70,6 @@ export async function proxy(request: NextRequest) {
         email.startsWith("demo.") ||
         email === "demo.egitim@sanayipro.com",
     );
-
-    const redirectTarget = (path: string) => {
-      const url = request.nextUrl.clone();
-      url.pathname = path;
-      return url;
-    };
 
     // Server-side route protection: Super Admin panel
     if (isSuperAdmin) {
