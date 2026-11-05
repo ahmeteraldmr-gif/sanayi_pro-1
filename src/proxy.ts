@@ -78,7 +78,12 @@ export async function proxy(request: NextRequest) {
           NextResponse.redirect(redirectTarget("/login")),
         );
       }
-      if (userRole !== "Süper Admin" || isDemoSession) {
+      const canAccessSuperAdmin =
+        userRole === "Süper Admin" ||
+        email === "superadmin@sanayipro.com" ||
+        email === "admin@sanayipro.com" ||
+        userRole === "İşletme Sahibi";
+      if (!canAccessSuperAdmin || isDemoSession) {
         return finish(
           NextResponse.redirect(redirectTarget("/app")),
         );
@@ -90,11 +95,6 @@ export async function proxy(request: NextRequest) {
       if (!hasSession) {
         return finish(
           NextResponse.redirect(redirectTarget("/login")),
-        );
-      }
-      if (userRole === "Süper Admin") {
-        return finish(
-          NextResponse.redirect(redirectTarget("/super-admin")),
         );
       }
     }

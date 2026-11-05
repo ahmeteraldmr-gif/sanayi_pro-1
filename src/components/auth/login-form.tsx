@@ -294,18 +294,58 @@ export function LoginForm({ configured: _configured = true }: LoginFormProps) {
         <button
           type="button"
           className="login-creds-pill"
-          onClick={() => handleFillDemoCreds("admin@sanayipro.com", "sanayipro_admin")}
+          style={
+            email === "superadmin@sanayipro.com"
+              ? { borderColor: "#a855f7", color: "#6b21a8", background: "#f3e8ff", fontWeight: 700 }
+              : { borderColor: "#d8b4fe", color: "#7e22ce", background: "#faf5ff" }
+          }
+          onClick={() => handleFillDemoCreds("superadmin@sanayipro.com", "sanayipro_admin")}
+          title="SaaS Platformu: Abonelikler, Paketler, İşletmeler ve Ödemeler"
         >
-          Yönetici Girişi
+          👑 Süper Admin (Platform)
         </button>
         <button
           type="button"
           className="login-creds-pill"
-          onClick={() => handleFillDemoCreds("mehmet.usta@sanayipro.com", "sanayipro_usta")}
+          style={email === "admin@sanayipro.com" ? { borderColor: "#3b82f6", color: "#1d4ed8", background: "#eff6ff", fontWeight: 700 } : undefined}
+          onClick={() => handleFillDemoCreds("admin@sanayipro.com", "sanayipro_admin")}
+          title="Oto Servis Paneli: İş Emirleri, Araç Kabul & Kasa"
         >
-          Usta Girişi
+          🏢 Servis Yöneticisi
+        </button>
+        <button
+          type="button"
+          className="login-creds-pill"
+          style={email === "mehmet.usta@sanayipro.com" ? { borderColor: "#10b981", color: "#047857", background: "#ecfdf5", fontWeight: 700 } : undefined}
+          onClick={() => handleFillDemoCreds("mehmet.usta@sanayipro.com", "sanayipro_usta")}
+          title="Atölye Masası: Tamir & Usta Ekranı"
+        >
+          🔧 Usta Girişi
         </button>
       </div>
+
+      {email === "superadmin@sanayipro.com" && (
+        <div style={{ background: "#faf5ff", border: "1px solid #e9d5ff", borderRadius: 8, padding: "8px 12px", fontSize: "12px", color: "#6b21a8", marginTop: "8px", display: "flex", alignItems: "flex-start", gap: 8 }}>
+          <Sparkles size={16} className="text-purple-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <strong>Süper Admin (Platform) Paneli</strong>
+            <p style={{ margin: "2px 0 0 0", color: "#7e22ce", fontSize: "11.5px" }}>
+              Giriş yaptığınızda <strong>Abonelikler, Kayıtlı İşletmeler, Paketler ve Ödeme Yönetimi</strong> ekranına yönlendirileceksiniz.
+            </p>
+          </div>
+        </div>
+      )}
+      {email === "admin@sanayipro.com" && (
+        <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, padding: "8px 12px", fontSize: "12px", color: "#1e40af", marginTop: "8px", display: "flex", alignItems: "flex-start", gap: 8 }}>
+          <Wrench size={16} className="text-blue-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <strong>Oto Servis Yönetim Paneli</strong>
+            <p style={{ margin: "2px 0 0 0", color: "#1d4ed8", fontSize: "11.5px" }}>
+              Giriş yaptığınızda servisinizin <strong>İş Emirleri, Araç Kabul, Müşteriler, Kasa ve Stok</strong> ekranına yönlendirileceksiniz.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* E-posta Alanı */}
       <div className="login-field">
