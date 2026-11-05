@@ -126,10 +126,6 @@ export function CorporateHome() {
                 <span>Hemen Bilgi Alın</span>
                 <ArrowRight size={17} />
               </a>
-              <a href={asset("/app/")} className="sp-btn-secondary" target="_blank" rel="noopener">
-                <span className="sp-live-dot" />
-                <span>Canlı Paneli Aç</span>
-              </a>
             </div>
 
             <div className="sp-hero-trust-row">
