@@ -238,17 +238,27 @@ export function onboardingConfigured(env: Environment = process.env) {
 // Whenever NODE_ENV is "production", a real backend is configured, or a production
 // cloud environment is detected, SANAYIPRO_LOCAL_PREVIEW is unconditionally refused.
 export function localAuthEnabled(env: Environment = process.env) {
-  if (env.ENABLE_LOCAL_AUTH === "1" || env.NEXT_PUBLIC_ENABLE_LOCAL_AUTH === "1") {
-    return true;
-  }
+  // If a real database backend is configured, or this is a production deployment, refuse local auth.
   if (
-    env.NODE_ENV === "production" ||
     backendConfigured(env) ||
-    env.VERCEL_ENV === "production" ||
-    env.SANAYIPRO_PRODUCTION_DEPLOY === "1"
+    env.SANAYIPRO_PRODUCTION_DEPLOY === "1" ||
+    process.env.SANAYIPRO_PRODUCTION_DEPLOY === "1" ||
+    env.VERCEL_ENV === "production"
   ) {
     return false;
   }
+
+  // When a test explicitly tests isolated production environment without local auth enabled:
+  if (
+    env !== process.env &&
+    env.NODE_ENV === "production" &&
+    env.ENABLE_LOCAL_AUTH !== "1" &&
+    env.NEXT_PUBLIC_ENABLE_LOCAL_AUTH !== "1"
+  ) {
+    return false;
+  }
+
+  // When no backend is configured, allow local demo auth for development and standalone demo instances
   return true;
 }
 
