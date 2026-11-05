@@ -242,13 +242,13 @@ export function localAuthEnabled(env: Environment = process.env) {
     return true;
   }
   if (
+    env.NODE_ENV === "production" ||
     backendConfigured(env) ||
     env.VERCEL_ENV === "production" ||
     env.SANAYIPRO_PRODUCTION_DEPLOY === "1"
   ) {
     return false;
   }
-  // When no backend is configured, allow local demo auth on preview/demo servers
   return true;
 }
 

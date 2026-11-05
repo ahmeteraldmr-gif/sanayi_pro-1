@@ -246,13 +246,16 @@ export function InteractiveGuide() {
       }
     };
 
-    // Immediate check
-    const initialEl = resolveTargetElement(activeStep.targetSelector);
-    if (initialEl) {
-      measureAndHighlight(initialEl);
-    } else {
-      setStatus("SEARCHING");
-    }
+    // Immediate check via microtask to avoid cascading renders inside effect
+    queueMicrotask(() => {
+      if (unmounted) return;
+      const initialEl = resolveTargetElement(activeStep.targetSelector);
+      if (initialEl) {
+        measureAndHighlight(initialEl);
+      } else {
+        setStatus("SEARCHING");
+      }
+    });
 
     // MutationObserver: ONLY observe child additions/removals, NEVER attributes!
     const observer = new MutationObserver(() => {

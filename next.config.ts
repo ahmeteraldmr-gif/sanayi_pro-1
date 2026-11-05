@@ -21,6 +21,9 @@ const nextConfig: NextConfig = {
   trailingSlash: true,
   poweredByHeader: false,
   devIndicators: false,
+  env: {
+    NEXT_PUBLIC_ENABLE_LOCAL_AUTH: "1",
+  },
   images: {
     unoptimized: true,
   },

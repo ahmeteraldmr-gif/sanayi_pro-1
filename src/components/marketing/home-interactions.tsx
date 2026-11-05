@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { ArrowRight, Check, Menu, Search, Clock3, Sparkles, ShieldCheck, Wrench, ChevronRight } from "lucide-react";
 import { useLocalRepository, useLocalReady } from "@/lib/local-repository";
