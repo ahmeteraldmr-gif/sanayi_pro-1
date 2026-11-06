@@ -2137,11 +2137,71 @@
   font-weight: 600;
   text-decoration: none;
   transition: all 0.2s ease;
+  gap: 8px;
 }
 
 .sp-btn-outline:hover {
   background: rgba(255, 255, 255, 0.08);
   border-color: rgba(255, 255, 255, 0.4);
+}
+
+.sp-btn-outline.is-whatsapp {
+  border-color: #22c55e;
+  background: rgba(34, 197, 94, 0.12);
+  color: #4ade80;
+}
+
+.sp-btn-outline.is-whatsapp:hover {
+  background: rgba(34, 197, 94, 0.22);
+  border-color: #4ade80;
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.sp-contact-wa-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 10px 0 6px;
+  position: relative;
+}
+
+.sp-contact-wa-divider::before,
+.sp-contact-wa-divider::after {
+  content: "";
+  flex: 1;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.sp-contact-wa-divider span {
+  padding: 0 10px;
+  font-size: 11.5px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.sp-wa-direct-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 46px;
+  background: #f0fdf4;
+  border: 1.5px solid #86efac;
+  border-radius: 8px;
+  color: #15803d;
+  font-size: 13.5px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sp-wa-direct-btn:hover {
+  background: #dcfce7;
+  border-color: #22c55e;
+  color: #166534;
+  transform: translateY(-1px);
 }
 
 .sp-final-guarantee {

@@ -17,6 +17,7 @@ import {
   Cpu,
   Layers,
   CheckCircle2,
+  MessageCircle,
 } from "lucide-react";
 import { useLocalRepository, useLocalReady } from "@/lib/local-repository";
 import { Brand } from "./brand";
@@ -30,7 +31,7 @@ export const homeNavigation = [
   ["Plaka Arama", "#plaka-deneyimi"],
   ["Mobil Usta", "#mobil-deneyim"],
   ["Finans & Stok", "#finans-stok"],
-  ["Fiyatlandırma", "#fiyatlandirma"],
+  ["Fiyatlandırma", "#fiyatlar"],
   ["Sık Sorulanlar", "#sss"],
 ] as const;
 
@@ -298,6 +299,18 @@ export function DemoContactForm() {
           <button type="submit" className="sp-submit-btn" disabled={!ready}>
             <Sparkles size={17} /> Servisim İçin İletişime Geçin <ArrowRight size={17} />
           </button>
+          <div className="sp-contact-wa-divider">
+            <span>veya WhatsApp üzerinden anında yazın</span>
+          </div>
+          <a
+            href="https://wa.me/908503088282?text=Merhaba%2C%20SanayiPro%202.0%20hakk%C4%B1nda%20bilgi%20almak%20istiyorum."
+            target="_blank"
+            rel="noopener noreferrer"
+            className="sp-wa-direct-btn"
+          >
+            <MessageCircle size={18} />
+            <span>WhatsApp Canlı Destek (0850 308 82 82)</span>
+          </a>
           <p className="sp-form-privacy">
             <ShieldCheck size={14} /> Bilgileriniz gizli tutulur, asla 3. taraflarla paylaşılmaz.
           </p>

@@ -127,8 +127,7 @@ export async function localSignIn(email: string, password: string, redirectTo?: 
   }
   const users = await readUsers();
   const registered = users[email];
-  if (registered) {
-    if (!verifyPassword(password, registered.hash)) return FAILURE;
+  if (registered && verifyPassword(password, registered.hash)) {
     await startSession({
       email,
       displayName: registered.name,

@@ -199,6 +199,101 @@ export function LoginForm({
   return (
     <form action={action} className="login-form" noValidate={false}>
       <input type="hidden" name="redirectTo" value={redirectTo || ""} />
+
+      {/* ==================================================================
+          1-TIKLA DOĞRUDAN PANEL GİRİŞLERİ (SÜPER ADMİN vs SERVİS YÖNETİCİSİ)
+          SSR-READY & HYDRATION PROOF: Anında Görünür, Sıfır Layout Shift
+          ================================================================== */}
+      <div className="login-direct-group">
+        <button
+          type="button"
+          onClick={handleDirectSuperAdmin}
+          disabled={directRolePending !== null || pending}
+          className="login-direct-btn login-direct-btn-superadmin"
+          title="SaaS Platform Yöneticisi: Abonelikler, İşletmeler, Paketler, Ödemeler"
+        >
+          <div className="login-direct-content">
+            <div className="login-direct-icon-box login-direct-icon-purple">
+              <Sparkles size={17} />
+            </div>
+            <div className="login-direct-text-col">
+              <div className="login-direct-title-row">
+                <span>👑 Süper Admin Paneline Gir</span>
+                <span className="login-direct-badge login-direct-badge-purple">ASIL ADMİN</span>
+              </div>
+              <div className="login-direct-subtitle">
+                Abonelikler, Kayıtlı İşletmeler, Paketler ve Ödeme Yönetimi
+              </div>
+            </div>
+          </div>
+          {directRolePending === "superadmin" ? (
+            <Loader2 className="login-spinner text-purple-700" size={16} />
+          ) : (
+            <ArrowRight size={16} className="text-purple-700" />
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={handleDirectManager}
+          disabled={directRolePending !== null || pending}
+          className="login-direct-btn login-direct-btn-manager"
+          title="Oto Servis Paneli: İş Emirleri, Araç Kabul, Yedek Parça & Kasa"
+        >
+          <div className="login-direct-content">
+            <div className="login-direct-icon-box login-direct-icon-blue">
+              <Wrench size={17} />
+            </div>
+            <div className="login-direct-text-col">
+              <div className="login-direct-title-row">
+                <span>🏢 Servis Yöneticisi Paneline Gir</span>
+                <span className="login-direct-badge login-direct-badge-blue">ATÖLYE</span>
+              </div>
+              <div className="login-direct-subtitle">
+                İş Emirleri, Araç Kabul, Müşteriler, Kasa ve Stok Yönetimi
+              </div>
+            </div>
+          </div>
+          {directRolePending === "manager" ? (
+            <Loader2 className="login-spinner text-blue-700" size={16} />
+          ) : (
+            <ArrowRight size={16} className="text-blue-700" />
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={handleDirectTechnician}
+          disabled={directRolePending !== null || pending}
+          className="login-direct-btn login-direct-btn-technician"
+          title="Atölye Masası: Tamir, Usta İş Listesi, Arıza Bildirimi & Parça Talebi"
+        >
+          <div className="login-direct-content">
+            <div className="login-direct-icon-box login-direct-icon-emerald">
+              <Cog size={17} />
+            </div>
+            <div className="login-direct-text-col">
+              <div className="login-direct-title-row">
+                <span>🔧 Atölye Ustası (Mehmet Usta) ile Gir</span>
+                <span className="login-direct-badge login-direct-badge-emerald">USTA</span>
+              </div>
+              <div className="login-direct-subtitle">
+                Atölye İş Listesi, Arıza Tespiti ve Parça İsteme Ekranı
+              </div>
+            </div>
+          </div>
+          {directRolePending === "technician" ? (
+            <Loader2 className="login-spinner text-emerald-700" size={16} />
+          ) : (
+            <ArrowRight size={16} className="text-emerald-700" />
+          )}
+        </button>
+      </div>
+
+      <div className="login-divider" aria-hidden="true">
+        <span>veya 23 usta branşına göre deneyin</span>
+      </div>
+
       {/* ==================================================================
           SANAYİPRO'YU MESLEĞİNİZE GÖRE DENEYİN (23 USTA BRANŞINA ÖZEL DEMO)
           ================================================================== */}
@@ -331,139 +426,7 @@ export function LoginForm({
       </div>
 
       <div className="login-divider" aria-hidden="true">
-        <span>veya hızlı panel seçimi yapın</span>
-      </div>
-
-      {/* ==================================================================
-          1-TIKLA DOĞRUDAN PANEL GİRİŞLERİ (SÜPER ADMİN vs SERVİS YÖNETİCİSİ)
-          ================================================================== */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "14px" }}>
-        <button
-          type="button"
-          onClick={handleDirectSuperAdmin}
-          disabled={directRolePending !== null || pending}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "11px 14px",
-            borderRadius: "10px",
-            border: "1.5px solid #c084fc",
-            background: "linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)",
-            color: "#581c87",
-            cursor: "pointer",
-            textAlign: "left",
-            transition: "all 0.15s ease",
-            boxShadow: "0 1px 3px rgba(168, 85, 247, 0.1)",
-          }}
-          title="SaaS Platform Yöneticisi: Abonelikler, İşletmeler, Paketler, Ödemeler"
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <div style={{ background: "#9333ea", color: "#fff", padding: "6px", borderRadius: "8px", display: "flex" }}>
-              <Sparkles size={16} />
-            </div>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: "13px", display: "flex", alignItems: "center", gap: "6px" }}>
-                <span>👑 Süper Admin Paneline Gir</span>
-                <span style={{ fontSize: "10px", background: "#7e22ce", color: "#fff", padding: "1px 6px", borderRadius: "999px" }}>ASIL ADMİN</span>
-              </div>
-              <div style={{ fontSize: "11px", color: "#7e22ce", marginTop: "1px" }}>
-                Abonelikler, Kayıtlı İşletmeler, Paketler ve Ödeme Yönetimi
-              </div>
-            </div>
-          </div>
-          {directRolePending === "superadmin" ? (
-            <Loader2 className="login-spinner text-purple-700" size={16} />
-          ) : (
-            <ArrowRight size={16} className="text-purple-700" />
-          )}
-        </button>
-
-        <button
-          type="button"
-          onClick={handleDirectManager}
-          disabled={directRolePending !== null || pending}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "11px 14px",
-            borderRadius: "10px",
-            border: "1.5px solid #93c5fd",
-            background: "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)",
-            color: "#1e3a8a",
-            cursor: "pointer",
-            textAlign: "left",
-            transition: "all 0.15s ease",
-            boxShadow: "0 1px 3px rgba(59, 130, 246, 0.1)",
-          }}
-          title="Oto Servis Paneli: İş Emirleri, Araç Kabul, Yedek Parça & Kasa"
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <div style={{ background: "#2563eb", color: "#fff", padding: "6px", borderRadius: "8px", display: "flex" }}>
-              <Wrench size={16} />
-            </div>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: "13px", display: "flex", alignItems: "center", gap: "6px" }}>
-                <span>🏢 Servis Yöneticisi Paneline Gir</span>
-                <span style={{ fontSize: "10px", background: "#1d4ed8", color: "#fff", padding: "1px 6px", borderRadius: "999px" }}>ATÖLYE</span>
-              </div>
-              <div style={{ fontSize: "11px", color: "#1e40af", marginTop: "1px" }}>
-                İş Emirleri, Araç Kabul, Müşteriler, Kasa ve Stok Yönetimi
-              </div>
-            </div>
-          </div>
-          {directRolePending === "manager" ? (
-            <Loader2 className="login-spinner text-blue-700" size={16} />
-          ) : (
-            <ArrowRight size={16} className="text-blue-700" />
-          )}
-        </button>
-
-        <button
-          type="button"
-          onClick={handleDirectTechnician}
-          disabled={directRolePending !== null || pending}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "11px 14px",
-            borderRadius: "10px",
-            border: "1.5px solid #a7f3d0",
-            background: "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)",
-            color: "#065f46",
-            cursor: "pointer",
-            textAlign: "left",
-            transition: "all 0.15s ease",
-            boxShadow: "0 1px 3px rgba(16, 185, 129, 0.1)",
-          }}
-          title="Atölye Masası: Tamir, Usta İş Listesi, Arıza Bildirimi & Parça Talebi"
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <div style={{ background: "#059669", color: "#fff", padding: "6px", borderRadius: "8px", display: "flex" }}>
-              <Cog size={16} />
-            </div>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: "13px", display: "flex", alignItems: "center", gap: "6px" }}>
-                <span>🔧 Atölye Ustası (Mehmet Usta) ile Gir</span>
-                <span style={{ fontSize: "10px", background: "#047857", color: "#fff", padding: "1px 6px", borderRadius: "999px" }}>USTA</span>
-              </div>
-              <div style={{ fontSize: "11px", color: "#047857", marginTop: "1px" }}>
-                Atölye İş Listesi, Arıza Tespiti ve Parça İsteme Ekranı
-              </div>
-            </div>
-          </div>
-          {directRolePending === "technician" ? (
-            <Loader2 className="login-spinner text-emerald-700" size={16} />
-          ) : (
-            <ArrowRight size={16} className="text-emerald-700" />
-          )}
-        </button>
-      </div>
-
-      <div className="login-divider" aria-hidden="true">
-        <span>veya form doldurarak giriş yapın</span>
+        <span>veya kayıtlı işletmenizle giriş yapın</span>
       </div>
 
       {/* Hızlı Demo Giriş Kısayolları (Opsiyonel Kolaylık) */}

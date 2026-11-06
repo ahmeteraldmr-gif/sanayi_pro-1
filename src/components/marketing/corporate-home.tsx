@@ -679,7 +679,8 @@ export function CorporateHome() {
         {/* =========================================================================
             SECTION: ŞEFFAF FİYATLANDIRMA & 14 GÜN ÜCRETSİZ DENEME
             ========================================================================= */}
-        <section className="sp-section sp-pricing-section" id="fiyatlandirma">
+        <section className="sp-section sp-pricing-section" id="fiyatlar">
+          <div id="fiyatlandirma" style={{ position: "relative", top: "-80px", visibility: "hidden" }} />
           <div className="sp-container">
             <div className="sp-section-header-centered">
               <span className="sp-sub-badge is-green">NET & ŞEFFAF YATIRIM</span>
@@ -756,6 +757,15 @@ export function CorporateHome() {
                   <span>Canlı Paneli Hemen Açın</span>
                   <ArrowRight size={17} />
                 </Link>
+                <a
+                  href="https://wa.me/908503088282?text=Merhaba%2C%20SanayiPro%202.0%20hakk%C4%B1nda%20bilgi%20almak%20istiyorum."
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="sp-btn-outline is-whatsapp"
+                >
+                  <MessageCircle size={17} />
+                  <span>WhatsApp ile Yazın</span>
+                </a>
                 <Link href="/login" className="sp-btn-outline">
                   Kayıtlı Giriş Yap
                 </Link>
@@ -802,6 +812,7 @@ export function CorporateHome() {
               <a href="#ozellikler">Özellikler</a>
               <a href="#nasil-calisir">İş Akışı</a>
               <a href="#urun-ekranlari">Ürün Ekranları</a>
+              <a href="#fiyatlar">Fiyatlandırma</a>
               <a href="#plaka-deneyimi">Plaka Deneyimi</a>
               <a href="#mobil-deneyim">Mobil Usta</a>
             </div>

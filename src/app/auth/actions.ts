@@ -95,27 +95,38 @@ export async function signInAction(
   redirect(target);
 }
 
-export async function startSuperAdminAction(redirectTo?: string): Promise<void> {
+export async function startSuperAdminAction(targetOrForm?: string | FormData): Promise<void> {
+  const redirectTo = typeof targetOrForm === "string" ? targetOrForm : String(targetOrForm?.get?.("redirectTo") ?? "");
   await startSuperAdminSession();
   const safe = sanitizeRedirectUrl(redirectTo, "/super-admin");
   redirect(safe);
 }
 
-export async function startServiceManagerAction(redirectTo?: string): Promise<void> {
+export async function startServiceManagerAction(targetOrForm?: string | FormData): Promise<void> {
+  const redirectTo = typeof targetOrForm === "string" ? targetOrForm : String(targetOrForm?.get?.("redirectTo") ?? "");
   await startServiceManagerSession();
   const safe = sanitizeRedirectUrl(redirectTo, "/app");
   redirect(safe);
 }
 
-export async function startTechnicianAction(redirectTo?: string): Promise<void> {
+export async function startTechnicianAction(targetOrForm?: string | FormData): Promise<void> {
+  const redirectTo = typeof targetOrForm === "string" ? targetOrForm : String(targetOrForm?.get?.("redirectTo") ?? "");
   await startTechnicianSession();
   const safe = sanitizeRedirectUrl(redirectTo, "/app");
   redirect(safe);
 }
 
-export async function startDemoTrialAction(branchId?: string, redirectTo?: string): Promise<void> {
-  await startDemoSession(branchId || "motor-mekanik");
-  const safe = sanitizeRedirectUrl(redirectTo, "/app");
+export async function startDemoTrialAction(branchOrForm?: string | FormData, redirectTo?: string): Promise<void> {
+  let branchId = "motor-mekanik";
+  let target = redirectTo;
+  if (typeof branchOrForm === "string") {
+    branchId = branchOrForm || "motor-mekanik";
+  } else if (branchOrForm) {
+    branchId = String(branchOrForm.get("branchId") ?? "motor-mekanik");
+    target = String(branchOrForm.get("redirectTo") ?? target ?? "");
+  }
+  await startDemoSession(branchId);
+  const safe = sanitizeRedirectUrl(target, "/app");
   redirect(safe);
 }
 
