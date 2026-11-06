@@ -45,7 +45,8 @@ export async function proxy(request: NextRequest) {
 
   const redirectTarget = (path: string) => {
     const url = request.nextUrl.clone();
-    url.pathname = path;
+    const clean = path.startsWith("/") ? path : `/${path}`;
+    url.pathname = clean.endsWith("/") ? clean : `${clean}/`;
     return url;
   };
 
@@ -65,11 +66,6 @@ export async function proxy(request: NextRequest) {
 
     const userRole = String(verifiedSession?.role || "");
     const email = String(verifiedSession?.email || "");
-    const isDemoSession = Boolean(
-      verifiedSession?.isDemoSession ||
-        email.startsWith("demo.") ||
-        email === "demo.egitim@sanayipro.com",
-    );
 
     // Server-side route protection: Super Admin panel
     if (isSuperAdmin) {
@@ -83,7 +79,7 @@ export async function proxy(request: NextRequest) {
         email === "superadmin@sanayipro.com" ||
         email === "admin@sanayipro.com" ||
         userRole === "İşletme Sahibi";
-      if (!canAccessSuperAdmin || isDemoSession) {
+      if (!canAccessSuperAdmin) {
         return finish(
           NextResponse.redirect(redirectTarget("/app")),
         );
@@ -166,12 +162,7 @@ export async function proxy(request: NextRequest) {
     const status = error instanceof AccessError ? error.status : 503;
     if (isApi) return finish(NextResponse.json({ error: code }, { status }));
     if (!isApp) return finish(response);
-    const target =
-      code === "UNAUTHENTICATED"
-        ? "/login"
-        : code === "FORBIDDEN" || code === "TENANT_REQUIRED"
-          ? "/auth/tenant"
-          : "/login?setup=required";
+    const target = "/login";
     return finish(NextResponse.redirect(redirectTarget(target)));
   }
 }

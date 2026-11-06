@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import {
   ArrowRight,
   CarFront,
@@ -24,6 +25,8 @@ import {
   DemoContactForm,
   ProductScreens,
   PlateSearchDemo,
+  FaultFinderShowcase,
+  PricingSection,
 } from "./home-interactions";
 
 const asset = (path: string) => `${process.env.NODE_ENV === "production" ? "/sanayipro" : ""}${path}`;
@@ -130,7 +133,7 @@ export function CorporateHome() {
             <div className="sp-hero-trust-row">
               <span><Check size={14} /> Kurulum gerektirmez</span>
               <span><Check size={14} /> Telefon & Tablette hazır</span>
-              <span><Check size={14} /> 10.000+ tamamlanan iş emri</span>
+              <span><Check size={14} /> Dikey Oto Servis Yönetimi</span>
               <span><Check size={14} /> Sıfır veri kaybı</span>
             </div>
 
@@ -381,6 +384,25 @@ export function CorporateHome() {
             </div>
 
             <ProductScreens />
+          </div>
+        </section>
+
+
+        {/* =========================================================================
+            SECTION: AI DESTEKLİ ARIZA BUL & OBD-II TEŞHİS MOTORU
+            ========================================================================= */}
+        <section className="sp-section sp-dark-navy" id="ariza-bul">
+          <div className="sp-container">
+            <div className="sp-section-header-centered">
+              <span className="sp-sub-badge is-cyan">OBD-II KOD ANALİZİ & YAPAY ZEKA TEŞHİS MOTORU</span>
+              <h2>Ustanın cebindeki yapay zeka asistanı:<br />Tahminle parça değiştirmeye son.</h2>
+              <p>
+                Motor arıza lambası yandığında P0300, P0420, P0401 gibi standart OBD-II ve üreticiye özel DTC kodlarını
+                Türkçe analiz edin. Ustanıza en olası nedenleri ve adım adım test sırasını sunun, teşhisi tek tıkla iş emrine işleyin.
+              </p>
+            </div>
+
+            <FaultFinderShowcase />
           </div>
         </section>
 
@@ -655,6 +677,25 @@ export function CorporateHome() {
 
 
         {/* =========================================================================
+            SECTION: ŞEFFAF FİYATLANDIRMA & 14 GÜN ÜCRETSİZ DENEME
+            ========================================================================= */}
+        <section className="sp-section sp-pricing-section" id="fiyatlandirma">
+          <div className="sp-container">
+            <div className="sp-section-header-centered">
+              <span className="sp-sub-badge is-green">NET & ŞEFFAF YATIRIM</span>
+              <h2>Her ölçekteki oto servis için adil fiyatlar.<br />14 gün boyunca ücretsiz deneyin.</h2>
+              <p>
+                Gizli maliyet veya kurulum ücreti yok. Servisinizin büyüklüğüne uygun paketi seçin,
+                kredi kartı vermeden hemen kullanmaya başlayın.
+              </p>
+            </div>
+
+            <PricingSection />
+          </div>
+        </section>
+
+
+        {/* =========================================================================
             SECTION 9: SIK SORULAN SORULAR (Rhythm 10: Pearl Gray #f8fafc)
             ========================================================================= */}
         <section className="sp-section sp-faq-section" id="sss">
@@ -710,14 +751,14 @@ export function CorporateHome() {
               </p>
 
               <div className="sp-final-actions">
-                <a href={asset("/app/")} className="sp-btn-primary is-large" target="_blank" rel="noopener">
+                <Link href="/app" className="sp-btn-primary is-large">
                   <span className="sp-pulse-dot" />
                   <span>Canlı Paneli Hemen Açın</span>
                   <ArrowRight size={17} />
-                </a>
-                <a href={asset("/login/")} className="sp-btn-outline">
+                </Link>
+                <Link href="/login" className="sp-btn-outline">
                   Kayıtlı Giriş Yap
-                </a>
+                </Link>
               </div>
 
               <div className="sp-final-guarantee">
@@ -775,8 +816,8 @@ export function CorporateHome() {
 
             <div className="sp-footer-links-col">
               <h5>Hızlı Erişim</h5>
-              <a href={asset("/app/")} target="_blank" rel="noopener">Canlı Panel</a>
-              <a href={asset("/login/")}>Kullanıcı Girişi</a>
+              <Link href="/app">Canlı Panel</Link>
+              <Link href="/login">Kullanıcı Girişi</Link>
               <a href="#ana-sayfa">Başa Dön ↑</a>
             </div>
           </div>

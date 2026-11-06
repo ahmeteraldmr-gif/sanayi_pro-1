@@ -14,7 +14,7 @@ import {
   type ServerWorkspaceSnapshot,
 } from "@/server/operations-dal";
 import { getTenantContext } from "@/server/tenant";
-import { AccessError, backendConfigured } from "@/server/security";
+import { backendConfigured } from "@/server/security";
 
 export const dynamic = "force-dynamic";
 
@@ -59,17 +59,8 @@ export default async function AppLayout({
         isDemo: false,
       };
       initialServerData = await loadTenantWorkspaceSnapshot();
-    } catch (error) {
-      if (
-        error instanceof AccessError &&
-        (error.code === "TENANT_REQUIRED" || error.code === "FORBIDDEN")
-      )
-        redirect("/auth/tenant");
-      redirect(
-        error instanceof AccessError && error.code === "UNAUTHENTICATED"
-          ? "/login"
-          : "/login?setup=required",
-      );
+    } catch {
+      redirect("/login");
     }
   } else {
     // Development-only cookie fallback (null in production builds).

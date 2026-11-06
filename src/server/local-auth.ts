@@ -157,7 +157,7 @@ export async function localSignIn(email: string, password: string) {
     displayName: demo?.name ?? "Demo Ustası",
     organizationName: isSuperAdmin ? "SanayiPro Platform" : "Sanayi Oto Servis",
     branchName: isSuperAdmin ? "Platform Merkezi" : "Dörtyol Şubesi",
-    role: demo?.role ?? "İşletme Sahibi",
+    role: isSuperAdmin ? "Süper Admin" : (demo?.role ?? "İşletme Sahibi"),
     organizationId: uuid(isSuperAdmin ? 0 : 1),
     branchId: uuid(isSuperAdmin ? 0 : 11),
     userId: uuid(isSuperAdmin ? 0 : 101),
@@ -239,6 +239,36 @@ export async function startDemoSession(branchId: string = "motor-mekanik") {
     branchId: uuid(demoBranchNum),
     userId: uuid(demoUserNum),
     isDemoSession: true,
+  });
+}
+
+export async function startSuperAdminSession() {
+  if (!localAuthEnabled()) return;
+  await startSession({
+    email: "superadmin@sanayipro.com",
+    displayName: "Platform Yöneticisi",
+    organizationName: "SanayiPro Platform",
+    branchName: "Platform Merkezi",
+    role: "Süper Admin",
+    organizationId: uuid(0),
+    branchId: uuid(0),
+    userId: uuid(0),
+    isDemoSession: false,
+  });
+}
+
+export async function startServiceManagerSession() {
+  if (!localAuthEnabled()) return;
+  await startSession({
+    email: "admin@sanayipro.com",
+    displayName: "Ahmet Yılmaz",
+    organizationName: "Sanayi Oto Servis",
+    branchName: "Dörtyol Şubesi",
+    role: "İşletme Sahibi",
+    organizationId: uuid(1),
+    branchId: uuid(11),
+    userId: uuid(101),
+    isDemoSession: false,
   });
 }
 

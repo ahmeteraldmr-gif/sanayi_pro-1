@@ -10,6 +10,8 @@ import {
   localSignIn,
   localSignUp,
   startDemoSession,
+  startSuperAdminSession,
+  startServiceManagerSession,
 } from "@/server/local-auth";
 import { provisionOwnerAccount } from "@/server/onboarding";
 import { completeSignIn } from "@/server/post-auth";
@@ -57,8 +59,15 @@ export async function signInAction(
     return { error: LOGIN_ERROR };
   }
 
-  // Development-only fallback; refused in production (see local-auth.ts).
-  if (!backendConfigured()) return localSignIn(email, password);
+  const isDemoUser =
+    email === "superadmin@sanayipro.com" ||
+    email === "admin@sanayipro.com" ||
+    email === "mehmet.usta@sanayipro.com" ||
+    email === "demo@sanayipro.com" ||
+    email.startsWith("demo.");
+
+  // If local auth is used or it's a known demo user, sign in directly via localSignIn
+  if (!backendConfigured() || isDemoUser) return localSignIn(email, password);
 
   let target = "/auth/tenant";
   try {
@@ -78,6 +87,16 @@ export async function signInAction(
     };
   }
   redirect(target);
+}
+
+export async function startSuperAdminAction(): Promise<void> {
+  await startSuperAdminSession();
+  redirect("/super-admin");
+}
+
+export async function startServiceManagerAction(): Promise<void> {
+  await startServiceManagerSession();
+  redirect("/app");
 }
 
 export async function startDemoTrialAction(branchId?: string): Promise<void> {

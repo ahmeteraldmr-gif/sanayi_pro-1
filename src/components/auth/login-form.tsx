@@ -35,7 +35,12 @@ import {
   Timer,
   Fuel,
 } from "lucide-react";
-import { signInAction, startDemoTrialAction } from "@/app/auth/actions";
+import {
+  signInAction,
+  startDemoTrialAction,
+  startSuperAdminAction,
+  startServiceManagerAction,
+} from "@/app/auth/actions";
 import {
   CRAFTSMAN_BRANCHES,
   type CraftsmanBranchId,
@@ -149,6 +154,30 @@ export function LoginForm({ configured: _configured = true }: LoginFormProps) {
   const handleFillDemoCreds = (demoEmail: string, demoPass: string) => {
     setEmail(demoEmail);
     setPassword(demoPass);
+  };
+
+  const [directRolePending, setDirectRolePending] = useState<"superadmin" | "manager" | null>(null);
+
+  const handleDirectSuperAdmin = async () => {
+    setDirectRolePending("superadmin");
+    try {
+      await startSuperAdminAction();
+    } catch (err) {
+      if (String(err).includes("NEXT_REDIRECT")) throw err;
+    } finally {
+      setDirectRolePending(null);
+    }
+  };
+
+  const handleDirectManager = async () => {
+    setDirectRolePending("manager");
+    try {
+      await startServiceManagerAction();
+    } catch (err) {
+      if (String(err).includes("NEXT_REDIRECT")) throw err;
+    } finally {
+      setDirectRolePending(null);
+    }
   };
 
   return (
@@ -285,12 +314,103 @@ export function LoginForm({ configured: _configured = true }: LoginFormProps) {
       </div>
 
       <div className="login-divider" aria-hidden="true">
-        <span>veya kayıtlı işletmenizle giriş yapın</span>
+        <span>veya hızlı panel seçimi yapın</span>
+      </div>
+
+      {/* ==================================================================
+          1-TIKLA DOĞRUDAN PANEL GİRİŞLERİ (SÜPER ADMİN vs SERVİS YÖNETİCİSİ)
+          ================================================================== */}
+      <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "14px" }}>
+        <button
+          type="button"
+          onClick={handleDirectSuperAdmin}
+          disabled={directRolePending !== null || pending}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "11px 14px",
+            borderRadius: "10px",
+            border: "1.5px solid #c084fc",
+            background: "linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)",
+            color: "#581c87",
+            cursor: "pointer",
+            textAlign: "left",
+            transition: "all 0.15s ease",
+            boxShadow: "0 1px 3px rgba(168, 85, 247, 0.1)",
+          }}
+          title="SaaS Platform Yöneticisi: Abonelikler, İşletmeler, Paketler, Ödemeler"
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <div style={{ background: "#9333ea", color: "#fff", padding: "6px", borderRadius: "8px", display: "flex" }}>
+              <Sparkles size={16} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: "13px", display: "flex", alignItems: "center", gap: "6px" }}>
+                <span>👑 Süper Admin Paneline Gir</span>
+                <span style={{ fontSize: "10px", background: "#7e22ce", color: "#fff", padding: "1px 6px", borderRadius: "999px" }}>ASIL ADMİN</span>
+              </div>
+              <div style={{ fontSize: "11px", color: "#7e22ce", marginTop: "1px" }}>
+                Abonelikler, Kayıtlı İşletmeler, Paketler ve Ödeme Yönetimi
+              </div>
+            </div>
+          </div>
+          {directRolePending === "superadmin" ? (
+            <Loader2 className="login-spinner text-purple-700" size={16} />
+          ) : (
+            <ArrowRight size={16} className="text-purple-700" />
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={handleDirectManager}
+          disabled={directRolePending !== null || pending}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "11px 14px",
+            borderRadius: "10px",
+            border: "1.5px solid #93c5fd",
+            background: "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)",
+            color: "#1e3a8a",
+            cursor: "pointer",
+            textAlign: "left",
+            transition: "all 0.15s ease",
+            boxShadow: "0 1px 3px rgba(59, 130, 246, 0.1)",
+          }}
+          title="Oto Servis Paneli: İş Emirleri, Araç Kabul, Yedek Parça & Kasa"
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <div style={{ background: "#2563eb", color: "#fff", padding: "6px", borderRadius: "8px", display: "flex" }}>
+              <Wrench size={16} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: "13px", display: "flex", alignItems: "center", gap: "6px" }}>
+                <span>🏢 Servis Yöneticisi Paneline Gir</span>
+                <span style={{ fontSize: "10px", background: "#1d4ed8", color: "#fff", padding: "1px 6px", borderRadius: "999px" }}>ATÖLYE</span>
+              </div>
+              <div style={{ fontSize: "11px", color: "#1e40af", marginTop: "1px" }}>
+                İş Emirleri, Araç Kabul, Müşteriler, Kasa ve Stok Yönetimi
+              </div>
+            </div>
+          </div>
+          {directRolePending === "manager" ? (
+            <Loader2 className="login-spinner text-blue-700" size={16} />
+          ) : (
+            <ArrowRight size={16} className="text-blue-700" />
+          )}
+        </button>
+      </div>
+
+      <div className="login-divider" aria-hidden="true">
+        <span>veya form doldurarak giriş yapın</span>
       </div>
 
       {/* Hızlı Demo Giriş Kısayolları (Opsiyonel Kolaylık) */}
       <div className="login-creds-quick-links">
-        <span className="login-creds-hint">Hızlı form doldur:</span>
+        <span className="login-creds-hint">Hızlı doldur:</span>
         <button
           type="button"
           className="login-creds-pill"
@@ -302,7 +422,7 @@ export function LoginForm({ configured: _configured = true }: LoginFormProps) {
           onClick={() => handleFillDemoCreds("superadmin@sanayipro.com", "sanayipro_admin")}
           title="SaaS Platformu: Abonelikler, Paketler, İşletmeler ve Ödemeler"
         >
-          👑 Süper Admin (Platform)
+          👑 Süper Admin
         </button>
         <button
           type="button"
