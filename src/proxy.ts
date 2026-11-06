@@ -43,136 +43,141 @@ export async function proxy(request: NextRequest) {
     return result;
   };
 
-  const redirectTarget = (path: string) => {
+  const redirectTarget = (path: string, originalPath?: string) => {
     const url = request.nextUrl.clone();
     const clean = path.startsWith("/") ? path : `/${path}`;
     url.pathname = clean.endsWith("/") ? clean : `${clean}/`;
+    if (originalPath) {
+      url.searchParams.set("redirect", originalPath);
+    } else {
+      url.searchParams.delete("redirect");
+    }
     return url;
   };
 
-  if (!backendConfigured()) {
-    if (isApi)
-      return finish(
-        NextResponse.json({ error: "CONFIGURATION" }, { status: 503 }),
-      );
+  // 1. Check verified local demo / craftsman session first
+  const sessionCookie = request.cookies.get("sanayipro-session")?.value;
+  const verifiedSession = verifySignedCookiePayload<Record<string, unknown>>(
+    sessionCookie,
+  );
+  const hasLocalSession = localAuthEnabled() && !!verifiedSession;
 
-    // Cookie fallback is development-only; production never trusts it.
-    // Even in local dev, cookies must pass HMAC-SHA256 verification.
-    const sessionCookie = request.cookies.get("sanayipro-session")?.value;
-    const verifiedSession = verifySignedCookiePayload<Record<string, unknown>>(
-      sessionCookie,
-    );
-    const hasSession = localAuthEnabled() && !!verifiedSession;
-
+  if (hasLocalSession) {
     const userRole = String(verifiedSession?.role || "");
     const email = String(verifiedSession?.email || "");
 
-    // Server-side route protection: Super Admin panel
+    // Super Admin route protection
     if (isSuperAdmin) {
-      if (!hasSession) {
-        return finish(
-          NextResponse.redirect(redirectTarget("/login")),
-        );
-      }
       const canAccessSuperAdmin =
         userRole === "Süper Admin" ||
         email === "superadmin@sanayipro.com" ||
         email === "admin@sanayipro.com" ||
         userRole === "İşletme Sahibi";
       if (!canAccessSuperAdmin) {
-        return finish(
-          NextResponse.redirect(redirectTarget("/app")),
-        );
+        return finish(NextResponse.redirect(redirectTarget("/app"), 307));
       }
     }
 
-    // Server-side route protection: unauthenticated users cannot open /app
-    if (isApp) {
-      if (!hasSession) {
-        return finish(
-          NextResponse.redirect(redirectTarget("/login")),
-        );
-      }
-    }
-
+    // Authenticated for /app, /super-admin, and /api
     return finish(response);
   }
 
-  try {
-    const { url, key } = getPublicAuthConfig();
-    const client = createServerClient(url, key, {
-      cookieOptions: {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        path: "/",
-      },
-      cookies: {
-        getAll: () => request.cookies.getAll(),
-        setAll: (values) => {
-          for (const { name, value } of values)
-            request.cookies.set(name, value);
-          const previous = response.cookies.getAll();
-          response = NextResponse.next({ request });
-          for (const cookie of previous) response.cookies.set(cookie);
-          for (const { name, value, options } of values)
-            response.cookies.set(name, value, {
-              ...options,
-              httpOnly: true,
-              secure: process.env.NODE_ENV === "production",
-              sameSite: "lax",
-            });
+  // 2. If no local session, and backend is configured, verify Supabase credentials
+  if (backendConfigured()) {
+    try {
+      const { url, key } = getPublicAuthConfig();
+      const client = createServerClient(url, key, {
+        cookieOptions: {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax",
+          path: "/",
         },
-      },
-    });
+        cookies: {
+          getAll: () => request.cookies.getAll(),
+          setAll: (values) => {
+            for (const { name, value } of values)
+              request.cookies.set(name, value);
+            const previous = response.cookies.getAll();
+            response = NextResponse.next({ request });
+            for (const cookie of previous) response.cookies.set(cookie);
+            for (const { name, value, options } of values)
+              response.cookies.set(name, value, {
+                ...options,
+                httpOnly: true,
+                secure: process.env.NODE_ENV === "production",
+                sameSite: "lax",
+              });
+          },
+        },
+      });
 
-    const { data, error } = await client.auth.getUser();
+      const { data, error } = await client.auth.getUser();
 
-    if (isSuperAdmin) {
-      if (error || !data.user || data.user.is_anonymous) {
-        return finish(NextResponse.redirect(redirectTarget("/login")));
+      if (isSuperAdmin) {
+        if (error || !data.user || data.user.is_anonymous) {
+          const original = `${request.nextUrl.basePath}${request.nextUrl.pathname}${request.nextUrl.search}`;
+          return finish(NextResponse.redirect(redirectTarget("/login", original), 307));
+        }
+        try {
+          await verifyPlatformAdmin(data.user.id);
+        } catch {
+          return finish(NextResponse.redirect(redirectTarget("/app"), 307));
+        }
+        return finish(response);
       }
-      try {
-        await verifyPlatformAdmin(data.user.id);
-      } catch {
-        return finish(NextResponse.redirect(redirectTarget("/app")));
+
+      if (isApp || isApi) {
+        if (error || !data.user || data.user.is_anonymous)
+          throw new AccessError("UNAUTHENTICATED", 401);
+        const selection = parseTenantSelection(
+          request.cookies.get(TENANT_COOKIE)?.value,
+        );
+        if (!selection) throw new AccessError("TENANT_REQUIRED", 409);
+        await authorizeVerifiedIdentity(
+          data.user.id,
+          selection,
+          "app.access",
+          async (tx) => {
+            void tx;
+          },
+        );
       }
       return finish(response);
+    } catch (error) {
+      const code = error instanceof AccessError ? error.code : "UNAVAILABLE";
+      const status = error instanceof AccessError ? error.status : 503;
+      if (isApi) return finish(NextResponse.json({ error: code }, { status }));
+      if (!isApp && !isSuperAdmin) return finish(response);
+      const original = `${request.nextUrl.basePath}${request.nextUrl.pathname}${request.nextUrl.search}`;
+      return finish(NextResponse.redirect(redirectTarget("/login", original), 307));
     }
-
-    if (isApp || isApi) {
-      if (error || !data.user || data.user.is_anonymous)
-        throw new AccessError("UNAUTHENTICATED", 401);
-      const selection = parseTenantSelection(
-        request.cookies.get(TENANT_COOKIE)?.value,
-      );
-      if (!selection) throw new AccessError("TENANT_REQUIRED", 409);
-      await authorizeVerifiedIdentity(
-        data.user.id,
-        selection,
-        "app.access",
-        async (tx) => {
-          void tx;
-        },
-      );
-    }
-    return finish(response);
-  } catch (error) {
-    const code = error instanceof AccessError ? error.code : "UNAVAILABLE";
-    const status = error instanceof AccessError ? error.status : 503;
-    if (isApi) return finish(NextResponse.json({ error: code }, { status }));
-    if (!isApp) return finish(response);
-    const target = "/login";
-    return finish(NextResponse.redirect(redirectTarget(target)));
   }
+
+  // 3. Neither local session nor backend authentication exists
+  if (isApi) {
+    return finish(
+      NextResponse.json({ error: "UNAUTHENTICATED" }, { status: 401 }),
+    );
+  }
+
+  if (isApp || isSuperAdmin) {
+    const original = `${request.nextUrl.basePath}${request.nextUrl.pathname}${request.nextUrl.search}`;
+    return finish(NextResponse.redirect(redirectTarget("/login", original), 307));
+  }
+
+  return finish(response);
 }
 
 export const config = {
   matcher: [
     "/app/:path*",
+    "/app",
     "/super-admin/:path*",
     "/super-admin",
+    "/login/:path*",
     "/login",
+    "/register/:path*",
     "/register",
     "/auth/:path*",
     "/api/tenant/:path*",

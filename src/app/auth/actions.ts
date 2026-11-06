@@ -12,6 +12,7 @@ import {
   startDemoSession,
   startSuperAdminSession,
   startServiceManagerSession,
+  startTechnicianSession,
 } from "@/server/local-auth";
 import { provisionOwnerAccount } from "@/server/onboarding";
 import { completeSignIn } from "@/server/post-auth";
@@ -19,6 +20,7 @@ import {
   backendConfigured,
   isUuid,
   onboardingConfigured,
+  sanitizeRedirectUrl,
   TENANT_COOKIE,
 } from "@/server/security";
 
@@ -49,6 +51,7 @@ export async function signInAction(
   void previous;
   const email = String(form.get("email") ?? "").trim().toLowerCase();
   const password = String(form.get("password") ?? "");
+  const redirectTo = sanitizeRedirectUrl(String(form.get("redirectTo") ?? ""));
 
   if (
     email.length > 254 ||
@@ -67,7 +70,7 @@ export async function signInAction(
     email.startsWith("demo.");
 
   // If local auth is used or it's a known demo user, sign in directly via localSignIn
-  if (!backendConfigured() || isDemoUser) return localSignIn(email, password);
+  if (!backendConfigured() || isDemoUser) return localSignIn(email, password, redirectTo);
 
   let target = "/auth/tenant";
   try {
@@ -80,6 +83,9 @@ export async function signInAction(
       return { error: LOGIN_ERROR };
     }
     target = await completeSignIn(data.user);
+    if (redirectTo && redirectTo.startsWith("/")) {
+      target = redirectTo;
+    }
   } catch (err) {
     if (isRedirect(err)) throw err;
     return {
@@ -89,19 +95,28 @@ export async function signInAction(
   redirect(target);
 }
 
-export async function startSuperAdminAction(): Promise<void> {
+export async function startSuperAdminAction(redirectTo?: string): Promise<void> {
   await startSuperAdminSession();
-  redirect("/super-admin");
+  const safe = sanitizeRedirectUrl(redirectTo, "/super-admin");
+  redirect(safe);
 }
 
-export async function startServiceManagerAction(): Promise<void> {
+export async function startServiceManagerAction(redirectTo?: string): Promise<void> {
   await startServiceManagerSession();
-  redirect("/app");
+  const safe = sanitizeRedirectUrl(redirectTo, "/app");
+  redirect(safe);
 }
 
-export async function startDemoTrialAction(branchId?: string): Promise<void> {
+export async function startTechnicianAction(redirectTo?: string): Promise<void> {
+  await startTechnicianSession();
+  const safe = sanitizeRedirectUrl(redirectTo, "/app");
+  redirect(safe);
+}
+
+export async function startDemoTrialAction(branchId?: string, redirectTo?: string): Promise<void> {
   await startDemoSession(branchId || "motor-mekanik");
-  redirect("/app");
+  const safe = sanitizeRedirectUrl(redirectTo, "/app");
+  redirect(safe);
 }
 
 async function requestOrigin() {

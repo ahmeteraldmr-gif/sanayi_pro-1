@@ -332,7 +332,8 @@ export function TrainingProvider({ children }: { children: ReactNode }) {
     setActiveTrackId(null);
     setWelcomeDismissed(false);
     if (typeof window !== "undefined") {
-      window.location.replace(`${window.location.origin}/app`);
+      const basePath = process.env.NODE_ENV === "production" ? "/sanayipro" : "";
+      window.location.replace(`${window.location.origin}${basePath}/app/`);
     }
   }, [setProgress, setActiveTrackId, setWelcomeDismissed]);
 

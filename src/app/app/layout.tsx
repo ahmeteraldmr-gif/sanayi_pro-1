@@ -41,7 +41,12 @@ export default async function AppLayout({
   let initialServerData: ServerWorkspaceSnapshot | null = null;
   const serverBackendReady = backendConfigured();
 
-  if (serverBackendReady) {
+  // 1. Check for active local demo / usta session first
+  const localSession = await readLocalSession();
+  if (localSession) {
+    activeTenantInfo = localSession;
+  } else if (serverBackendReady) {
+    // 2. Fall back to verified Supabase tenant session
     try {
       const tenant = await getTenantContext();
       const meta = (await getVerifiedUser()).user_metadata as
@@ -60,19 +65,17 @@ export default async function AppLayout({
       };
       initialServerData = await loadTenantWorkspaceSnapshot();
     } catch {
-      redirect("/login");
+      redirect("/login?redirect=/sanayipro/app/");
     }
   } else {
-    // Development-only cookie fallback (null in production builds).
-    activeTenantInfo = await readLocalSession();
-    if (!activeTenantInfo) redirect("/login");
+    redirect("/login?redirect=/sanayipro/app/");
   }
 
   return (
     <DemoProvider
       activeTenantInfo={activeTenantInfo}
       initialServerData={initialServerData}
-      serverBackendReady={serverBackendReady}
+      serverBackendReady={serverBackendReady && !activeTenantInfo?.isDemo}
     >
       <ApplicationShell activeTenantInfo={activeTenantInfo}>
         {children}

@@ -363,10 +363,11 @@ function DemoState({
   const switchBranch = useCallback(async (newBranchId: CraftsmanBranchId) => {
     try {
       await startDemoTrialAction(newBranchId);
-    } finally {
-      // Force clean reload to ensure layout cookies and state re-mount cleanly
+    } catch (err) {
+      if (String(err).includes("NEXT_REDIRECT")) throw err;
+      const basePath = process.env.NODE_ENV === "production" ? "/sanayipro" : "";
       // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-      window.location.href = "/app";
+      window.location.href = `${basePath}/app/`;
     }
   }, []);
 

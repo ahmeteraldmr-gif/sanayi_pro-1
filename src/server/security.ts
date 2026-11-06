@@ -324,3 +324,36 @@ export function assertOnboardingCapabilities(
   )
     throw new AccessError("CONFIGURATION", 503);
 }
+
+export function sanitizeRedirectUrl(
+  raw: string | undefined | null,
+  fallback: string = "/app",
+): string {
+  if (!raw || typeof raw !== "string") return fallback;
+  const trimmed = raw.trim();
+  if (!trimmed) return fallback;
+
+  // Handle absolute URL if it belongs to same origin
+  try {
+    if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+      const parsed = new URL(trimmed);
+      return sanitizeRedirectUrl(parsed.pathname + parsed.search, fallback);
+    }
+  } catch {
+    return fallback;
+  }
+
+  // Prevent protocol-relative open redirects ("//malicious.com")
+  if (!trimmed.startsWith("/") || trimmed.startsWith("//")) return fallback;
+
+  // Next.js redirect() automatically handles basePath ("/sanayipro") from next.config.ts.
+  // If the redirect param contains basePath prefix, strip it so Next.js doesn't duplicate it!
+  let path = trimmed;
+  if (path.startsWith("/sanayipro/")) {
+    path = path.slice("/sanayipro".length);
+  } else if (path === "/sanayipro") {
+    path = "/";
+  }
+
+  return path || fallback;
+}

@@ -23,7 +23,14 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default function LoginPage() {
+interface LoginPageProps {
+  searchParams?: Promise<{ redirect?: string; expired?: string; setup?: string }>;
+}
+
+export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const resolved = searchParams ? await searchParams : {};
+  const redirectTo = resolved?.redirect;
+  const isExpired = resolved?.expired === "1";
   const configured = backendConfigured();
 
   return (
@@ -151,9 +158,18 @@ export default function LoginPage() {
                 Giriş yaptıktan sonra yetkili olduğunuz işletme ve şubeye
                 erişebilirsiniz.
               </p>
+              {isExpired ? (
+                <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, padding: "8px 12px", fontSize: "12px", color: "#92400e", marginTop: "10px", display: "flex", alignItems: "center", gap: 8 }}>
+                  <span>⚠️ Oturum süreniz sona erdi. Lütfen devam etmek için giriş yapın.</span>
+                </div>
+              ) : redirectTo ? (
+                <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, padding: "8px 12px", fontSize: "12px", color: "#1e40af", marginTop: "10px", display: "flex", alignItems: "center", gap: 8 }}>
+                  <span>🔒 Güvenli servis alanına erişmek için lütfen giriş yapın veya hızlı profil seçin.</span>
+                </div>
+              ) : null}
             </div>
 
-            <LoginForm configured={configured} />
+            <LoginForm configured={configured} redirectTo={redirectTo} />
           </div>
 
           {/* Kart Altı 3 Güven / Uyumluluk Öğesi */}

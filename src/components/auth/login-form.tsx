@@ -40,6 +40,7 @@ import {
   startDemoTrialAction,
   startSuperAdminAction,
   startServiceManagerAction,
+  startTechnicianAction,
 } from "@/app/auth/actions";
 import {
   CRAFTSMAN_BRANCHES,
@@ -49,6 +50,7 @@ import {
 
 interface LoginFormProps {
   configured?: boolean;
+  redirectTo?: string;
 }
 
 const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
@@ -84,7 +86,10 @@ const CATEGORIES: Array<{ id: "ALL" | BranchCategory; label: string }> = [
   { id: "Donanım, Lastik & Bakım", label: "Donanım & Bakım (2)" },
 ];
 
-export function LoginForm({ configured: _configured = true }: LoginFormProps) {
+export function LoginForm({
+  configured: _configured = true,
+  redirectTo,
+}: LoginFormProps) {
   void _configured;
   const [state, action, pending] = useActionState(signInAction, null);
   const [showPassword, setShowPassword] = useState(false);
@@ -143,7 +148,7 @@ export function LoginForm({ configured: _configured = true }: LoginFormProps) {
   const handleStartBranchDemo = async () => {
     setDemoPending(true);
     try {
-      await startDemoTrialAction(selectedBranch.id);
+      await startDemoTrialAction(selectedBranch.id, redirectTo);
     } catch (err) {
       if (String(err).includes("NEXT_REDIRECT")) throw err;
     } finally {
@@ -156,12 +161,12 @@ export function LoginForm({ configured: _configured = true }: LoginFormProps) {
     setPassword(demoPass);
   };
 
-  const [directRolePending, setDirectRolePending] = useState<"superadmin" | "manager" | null>(null);
+  const [directRolePending, setDirectRolePending] = useState<"superadmin" | "manager" | "technician" | null>(null);
 
   const handleDirectSuperAdmin = async () => {
     setDirectRolePending("superadmin");
     try {
-      await startSuperAdminAction();
+      await startSuperAdminAction(redirectTo);
     } catch (err) {
       if (String(err).includes("NEXT_REDIRECT")) throw err;
     } finally {
@@ -172,7 +177,18 @@ export function LoginForm({ configured: _configured = true }: LoginFormProps) {
   const handleDirectManager = async () => {
     setDirectRolePending("manager");
     try {
-      await startServiceManagerAction();
+      await startServiceManagerAction(redirectTo);
+    } catch (err) {
+      if (String(err).includes("NEXT_REDIRECT")) throw err;
+    } finally {
+      setDirectRolePending(null);
+    }
+  };
+
+  const handleDirectTechnician = async () => {
+    setDirectRolePending("technician");
+    try {
+      await startTechnicianAction(redirectTo);
     } catch (err) {
       if (String(err).includes("NEXT_REDIRECT")) throw err;
     } finally {
@@ -182,6 +198,7 @@ export function LoginForm({ configured: _configured = true }: LoginFormProps) {
 
   return (
     <form action={action} className="login-form" noValidate={false}>
+      <input type="hidden" name="redirectTo" value={redirectTo || ""} />
       {/* ==================================================================
           SANAYİPRO'YU MESLEĞİNİZE GÖRE DENEYİN (23 USTA BRANŞINA ÖZEL DEMO)
           ================================================================== */}
@@ -400,6 +417,47 @@ export function LoginForm({ configured: _configured = true }: LoginFormProps) {
             <Loader2 className="login-spinner text-blue-700" size={16} />
           ) : (
             <ArrowRight size={16} className="text-blue-700" />
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={handleDirectTechnician}
+          disabled={directRolePending !== null || pending}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "11px 14px",
+            borderRadius: "10px",
+            border: "1.5px solid #a7f3d0",
+            background: "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)",
+            color: "#065f46",
+            cursor: "pointer",
+            textAlign: "left",
+            transition: "all 0.15s ease",
+            boxShadow: "0 1px 3px rgba(16, 185, 129, 0.1)",
+          }}
+          title="Atölye Masası: Tamir, Usta İş Listesi, Arıza Bildirimi & Parça Talebi"
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <div style={{ background: "#059669", color: "#fff", padding: "6px", borderRadius: "8px", display: "flex" }}>
+              <Cog size={16} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: "13px", display: "flex", alignItems: "center", gap: "6px" }}>
+                <span>🔧 Atölye Ustası (Mehmet Usta) ile Gir</span>
+                <span style={{ fontSize: "10px", background: "#047857", color: "#fff", padding: "1px 6px", borderRadius: "999px" }}>USTA</span>
+              </div>
+              <div style={{ fontSize: "11px", color: "#047857", marginTop: "1px" }}>
+                Atölye İş Listesi, Arıza Tespiti ve Parça İsteme Ekranı
+              </div>
+            </div>
+          </div>
+          {directRolePending === "technician" ? (
+            <Loader2 className="login-spinner text-emerald-700" size={16} />
+          ) : (
+            <ArrowRight size={16} className="text-emerald-700" />
           )}
         </button>
       </div>

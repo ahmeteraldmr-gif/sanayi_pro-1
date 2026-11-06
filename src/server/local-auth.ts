@@ -118,7 +118,7 @@ async function startSession(session: {
 }
 const uuid = (n: number) => `00000000-0000-0000-0000-${String(n).padStart(12, "0")}`;
 
-export async function localSignIn(email: string, password: string) {
+export async function localSignIn(email: string, password: string, redirectTo?: string) {
   if (!localAuthEnabled()) return FAILURE;
   try {
     checkRateLimit(`local-signin:${email}`, 12, 60_000);
@@ -140,7 +140,8 @@ export async function localSignIn(email: string, password: string) {
       userId: registered.userId ?? uuid(101),
       isDemoSession: false,
     });
-    redirect("/app");
+    const target = redirectTo && redirectTo.startsWith("/") ? redirectTo : "/app";
+    redirect(target);
   }
 
   // Only explicit demo accounts or demo.<slug>@sanayipro.com are permitted without registration
@@ -164,9 +165,11 @@ export async function localSignIn(email: string, password: string) {
     isDemoSession: isBranchDemoEmail || email === "demo@sanayipro.com",
   });
   if (isSuperAdmin) {
-    redirect("/super-admin");
+    const target = redirectTo && redirectTo.startsWith("/") ? redirectTo : "/super-admin";
+    redirect(target);
   } else {
-    redirect("/app");
+    const target = redirectTo && redirectTo.startsWith("/") ? redirectTo : "/app";
+    redirect(target);
   }
 }
 
@@ -268,6 +271,21 @@ export async function startServiceManagerSession() {
     organizationId: uuid(1),
     branchId: uuid(11),
     userId: uuid(101),
+    isDemoSession: false,
+  });
+}
+
+export async function startTechnicianSession() {
+  if (!localAuthEnabled()) return;
+  await startSession({
+    email: "mehmet.usta@sanayipro.com",
+    displayName: "Mehmet Usta",
+    organizationName: "Sanayi Oto Servis",
+    branchName: "Dörtyol Şubesi",
+    role: "Atölye Ustası",
+    organizationId: uuid(1),
+    branchId: uuid(11),
+    userId: uuid(102),
     isDemoSession: false,
   });
 }
