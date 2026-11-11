@@ -95,25 +95,32 @@ export async function signInAction(
   redirect(target);
 }
 
+export async function signInFormAction(form: FormData): Promise<void> {
+  await signInAction(null, form);
+}
+
 export async function startSuperAdminAction(targetOrForm?: string | FormData): Promise<void> {
   const redirectTo = typeof targetOrForm === "string" ? targetOrForm : String(targetOrForm?.get?.("redirectTo") ?? "");
   await startSuperAdminSession();
   const safe = sanitizeRedirectUrl(redirectTo, "/super-admin");
-  redirect(safe);
+  const target = safe === "/super-admin" || safe.startsWith("/super-admin/") ? safe : "/super-admin";
+  redirect(target);
 }
 
 export async function startServiceManagerAction(targetOrForm?: string | FormData): Promise<void> {
   const redirectTo = typeof targetOrForm === "string" ? targetOrForm : String(targetOrForm?.get?.("redirectTo") ?? "");
   await startServiceManagerSession();
   const safe = sanitizeRedirectUrl(redirectTo, "/app");
-  redirect(safe);
+  const target = safe === "/super-admin" || safe.startsWith("/super-admin/") ? "/app" : safe;
+  redirect(target);
 }
 
 export async function startTechnicianAction(targetOrForm?: string | FormData): Promise<void> {
   const redirectTo = typeof targetOrForm === "string" ? targetOrForm : String(targetOrForm?.get?.("redirectTo") ?? "");
   await startTechnicianSession();
   const safe = sanitizeRedirectUrl(redirectTo, "/app");
-  redirect(safe);
+  const target = safe === "/super-admin" || safe.startsWith("/super-admin/") ? "/app" : safe;
+  redirect(target);
 }
 
 export async function startDemoTrialAction(branchOrForm?: string | FormData, redirectTo?: string): Promise<void> {
@@ -127,7 +134,8 @@ export async function startDemoTrialAction(branchOrForm?: string | FormData, red
   }
   await startDemoSession(branchId);
   const safe = sanitizeRedirectUrl(target, "/app");
-  redirect(safe);
+  const finalTarget = safe === "/super-admin" || safe.startsWith("/super-admin/") ? "/app" : safe;
+  redirect(finalTarget);
 }
 
 async function requestOrigin() {

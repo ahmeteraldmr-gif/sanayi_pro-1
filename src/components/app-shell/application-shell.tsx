@@ -230,16 +230,6 @@ const SidebarNavigation = memo(function SidebarNavigation({
           <CircleHelp size={18} />
           <span>Yardım</span>
         </Link>
-        <Link
-          href="/super-admin"
-          prefetch={true}
-          className={`app-nav-link ${activePath.startsWith("/super-admin") ? "is-active" : ""}`}
-          style={{ color: "#7e22ce", fontWeight: 600 }}
-          title="Platform Yönetimi: Abonelikler, İşletmeler, Paketler & Tahsilatlar"
-        >
-          <ShieldCheck size={18} className="text-purple-600" />
-          <span>Süper Admin</span>
-        </Link>
         <Link className="app-back-to-site" href="/">
           SanayiPro <ArrowUpRight size={14} />
         </Link>
@@ -876,14 +866,6 @@ export function ApplicationShell({
               </select>
               <ChevronDown size={14} aria-hidden="true" />
             </label>
-            <Link
-              href="/super-admin"
-              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-md border border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100 hover:border-purple-300 transition-colors shadow-2xs"
-              title="SaaS Platform Yönetimi: Abonelikler, İşletmeler, Paketler & Tahsilatlar"
-            >
-              <ShieldCheck size={14} className="text-purple-600" />
-              <span>Süper Admin Paneli</span>
-            </Link>
             <div>
               <Dialog open={notifOpen} onOpenChange={setNotifOpen}>
                 <DialogTrigger asChild>
@@ -1045,13 +1027,6 @@ export function ApplicationShell({
                     <DialogClose asChild>
                       <Button asChild className="w-full justify-start gap-2">
                         <Link href="/app/settings">Abonelik & Ayarları Aç</Link>
-                      </Button>
-                    </DialogClose>
-                    <DialogClose asChild>
-                      <Button asChild variant="outline" className="w-full justify-start gap-2 text-purple-700 border-purple-200 bg-purple-50/50 hover:bg-purple-100 hover:text-purple-800 font-semibold">
-                        <Link href="/super-admin">
-                          <ShieldCheck size={16} className="text-purple-600" /> Süper Admin (Platform Paneli)
-                        </Link>
                       </Button>
                     </DialogClose>
                   </div>

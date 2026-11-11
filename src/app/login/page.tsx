@@ -1,7 +1,10 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Brand } from "@/components/marketing/brand";
 import { LoginForm } from "@/components/auth/login-form";
+import { LoginErrorBoundary } from "@/components/auth/login-error-boundary";
+import { LoginStaticFallback } from "@/components/auth/login-fallback";
 import { backendConfigured } from "@/server/security";
 import {
   ClipboardCheck,
@@ -169,7 +172,11 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
               ) : null}
             </div>
 
-            <LoginForm configured={configured} redirectTo={redirectTo} />
+            <LoginErrorBoundary redirectTo={redirectTo}>
+              <Suspense fallback={<LoginStaticFallback redirectTo={redirectTo} />}>
+                <LoginForm configured={configured} redirectTo={redirectTo} />
+              </Suspense>
+            </LoginErrorBoundary>
           </div>
 
           {/* Kart Altı 3 Güven / Uyumluluk Öğesi */}

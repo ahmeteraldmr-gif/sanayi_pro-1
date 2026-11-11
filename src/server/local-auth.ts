@@ -164,10 +164,19 @@ export async function localSignIn(email: string, password: string, redirectTo?: 
     isDemoSession: isBranchDemoEmail || email === "demo@sanayipro.com",
   });
   if (isSuperAdmin) {
-    const target = redirectTo && redirectTo.startsWith("/") ? redirectTo : "/super-admin";
+    const target =
+      redirectTo && (redirectTo === "/super-admin" || redirectTo.startsWith("/super-admin/"))
+        ? redirectTo
+        : "/super-admin";
     redirect(target);
   } else {
-    const target = redirectTo && redirectTo.startsWith("/") ? redirectTo : "/app";
+    const target =
+      redirectTo &&
+      redirectTo.startsWith("/") &&
+      redirectTo !== "/super-admin" &&
+      !redirectTo.startsWith("/super-admin/")
+        ? redirectTo
+        : "/app";
     redirect(target);
   }
 }

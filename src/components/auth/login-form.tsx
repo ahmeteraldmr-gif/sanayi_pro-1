@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState, useMemo } from "react";
+import { useActionState, useState, useMemo, type MouseEvent } from "react";
 import Link from "next/link";
 import {
   Mail,
@@ -34,6 +34,18 @@ import {
   CircleDot,
   Timer,
   Fuel,
+  Activity,
+  Armchair,
+  Battery,
+  Clock,
+  Key,
+  Navigation,
+  Palette,
+  Repeat,
+  ShieldAlert,
+  Square,
+  Target,
+  Volume2,
 } from "lucide-react";
 import {
   signInAction,
@@ -76,7 +88,25 @@ const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: 
   CircleDot,
   Timer,
   Fuel,
+  Activity,
+  Armchair,
+  Battery,
+  Clock,
+  Key,
+  Navigation,
+  Palette,
+  Repeat,
+  ShieldAlert,
+  Square,
+  Target,
+  Volume2,
 };
+
+function getBranchIcon(name?: string): React.ComponentType<{ size?: number; className?: string }> {
+  if (!name) return Wrench;
+  const found = ICON_MAP[name];
+  return (typeof found === "function" || typeof found === "object") ? found : Wrench;
+}
 
 const CATEGORIES: Array<{ id: "ALL" | BranchCategory; label: string }> = [
   { id: "ALL", label: "Tümü (23)" },
@@ -143,9 +173,10 @@ export function LoginForm({
     );
   }, [selectedBranchId]);
 
-  const SelectedIcon = ICON_MAP[selectedBranch.icon] ?? Wrench;
+  const SelectedIcon = getBranchIcon(selectedBranch?.icon);
 
-  const handleStartBranchDemo = async () => {
+  const handleStartBranchDemo = async (e?: MouseEvent<HTMLButtonElement>) => {
+    e?.preventDefault();
     setDemoPending(true);
     try {
       await startDemoTrialAction(selectedBranch.id, redirectTo);
@@ -163,7 +194,8 @@ export function LoginForm({
 
   const [directRolePending, setDirectRolePending] = useState<"superadmin" | "manager" | "technician" | null>(null);
 
-  const handleDirectSuperAdmin = async () => {
+  const handleDirectSuperAdmin = async (e?: MouseEvent<HTMLButtonElement>) => {
+    e?.preventDefault();
     setDirectRolePending("superadmin");
     try {
       await startSuperAdminAction(redirectTo);
@@ -174,7 +206,8 @@ export function LoginForm({
     }
   };
 
-  const handleDirectManager = async () => {
+  const handleDirectManager = async (e?: MouseEvent<HTMLButtonElement>) => {
+    e?.preventDefault();
     setDirectRolePending("manager");
     try {
       await startServiceManagerAction(redirectTo);
@@ -185,7 +218,8 @@ export function LoginForm({
     }
   };
 
-  const handleDirectTechnician = async () => {
+  const handleDirectTechnician = async (e?: MouseEvent<HTMLButtonElement>) => {
+    e?.preventDefault();
     setDirectRolePending("technician");
     try {
       await startTechnicianAction(redirectTo);
@@ -197,8 +231,9 @@ export function LoginForm({
   };
 
   return (
-    <form action={action} className="login-form" noValidate={false}>
+    <form action={action} className="login-form" noValidate={false} suppressHydrationWarning>
       <input type="hidden" name="redirectTo" value={redirectTo || ""} />
+      <input type="hidden" name="branchId" value={selectedBranch.id} />
 
       {/* ==================================================================
           1-TIKLA DOĞRUDAN PANEL GİRİŞLERİ (SÜPER ADMİN vs SERVİS YÖNETİCİSİ)
@@ -206,7 +241,9 @@ export function LoginForm({
           ================================================================== */}
       <div className="login-direct-group">
         <button
-          type="button"
+          type="submit"
+          formAction={startSuperAdminAction}
+          formNoValidate
           onClick={handleDirectSuperAdmin}
           disabled={directRolePending !== null || pending}
           className="login-direct-btn login-direct-btn-superadmin"
@@ -234,7 +271,9 @@ export function LoginForm({
         </button>
 
         <button
-          type="button"
+          type="submit"
+          formAction={startServiceManagerAction}
+          formNoValidate
           onClick={handleDirectManager}
           disabled={directRolePending !== null || pending}
           className="login-direct-btn login-direct-btn-manager"
@@ -262,7 +301,9 @@ export function LoginForm({
         </button>
 
         <button
-          type="button"
+          type="submit"
+          formAction={startTechnicianAction}
+          formNoValidate
           onClick={handleDirectTechnician}
           disabled={directRolePending !== null || pending}
           className="login-direct-btn login-direct-btn-technician"
@@ -350,7 +391,7 @@ export function LoginForm({
           aria-label="SanayiPro Usta Branşları"
         >
           {filteredBranches.map((branch) => {
-            const Icon = ICON_MAP[branch.icon] ?? Wrench;
+            const Icon = getBranchIcon(branch?.icon);
             const isSelected = selectedBranchId === branch.id;
 
             return (
@@ -404,7 +445,9 @@ export function LoginForm({
 
         {/* Dinamik Branş Giriş Butonu */}
         <button
-          type="button"
+          type="submit"
+          formAction={startDemoTrialAction}
+          formNoValidate
           onClick={handleStartBranchDemo}
           disabled={demoPending || pending}
           className="login-branch-demo-action-btn"
@@ -509,6 +552,7 @@ export function LoginForm({
             disabled={pending}
             aria-invalid={!!state?.error}
             aria-describedby={state?.error ? "login-error-msg" : undefined}
+            suppressHydrationWarning
             className="login-input"
           />
         </div>
@@ -548,6 +592,7 @@ export function LoginForm({
             disabled={pending}
             aria-invalid={!!state?.error}
             aria-describedby={state?.error ? "login-error-msg" : undefined}
+            suppressHydrationWarning
             className="login-input"
           />
           <button

@@ -66,13 +66,11 @@ export async function proxy(request: NextRequest) {
     const userRole = String(verifiedSession?.role || "");
     const email = String(verifiedSession?.email || "");
 
-    // Super Admin route protection
+    // Super Admin route protection — strictly isolated from normal business/craftsman panels
     if (isSuperAdmin) {
       const canAccessSuperAdmin =
         userRole === "Süper Admin" ||
-        email === "superadmin@sanayipro.com" ||
-        email === "admin@sanayipro.com" ||
-        userRole === "İşletme Sahibi";
+        email === "superadmin@sanayipro.com";
       if (!canAccessSuperAdmin) {
         return finish(NextResponse.redirect(redirectTarget("/app"), 307));
       }
