@@ -1,0 +1,7 @@
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteBase /sanayipro/
+
+# SanayiPro Next.js PM2 (Port 3000) Reverse Proxy
+RewriteRule ^(.*)$ http://127.0.0.1:3000/sanayipro/$1 [P,L,QSA]
+</IfModule>
